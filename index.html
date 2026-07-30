@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="sv">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Sideways – färgväljare</title>
+  <link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <h1>Sideways <span>färgväljare</span></h1>
+    <p class="tagline">RF1903 Sideways Soffa &amp; RF1904 Sideways Loungefåtölj · Design Rikke Frost för Carl&nbsp;Hansen&nbsp;&amp;&nbsp;Søn</p>
+  </header>
+
+  <main class="layout">
+    <!-- ==================== Product stage ==================== -->
+    <section class="stage" aria-label="Produktvisning">
+
+      <!-- RF1903-L Sideways Sofa -->
+      <div class="product-card" id="card-sofa" data-product="sofa" tabindex="0" role="button" aria-pressed="true">
+        <h2>RF1903-L Sideways Soffa</h2>
+        <svg viewBox="0 0 640 360" class="furniture" id="svg-sofa" aria-label="Illustration av Sideways-soffan">
+          <defs>
+            <pattern id="cord-sofa" width="8" height="10" patternUnits="userSpaceOnUse">
+              <rect width="8" height="10" class="p-cord" />
+              <line x1="4" y1="0" x2="4" y2="10" class="p-cord-line" />
+            </pattern>
+          </defs>
+
+          <!-- floor shadow -->
+          <ellipse cx="320" cy="330" rx="270" ry="16" class="shadow" />
+
+          <!-- back frame: cord panel between curved wooden rails -->
+          <path d="M 90 120 Q 320 92 550 120 L 550 208 Q 320 186 90 208 Z" fill="url(#cord-sofa)" />
+          <path d="M 84 112 Q 320 84 556 112 L 556 126 Q 320 98 84 126 Z" class="wood" />
+          <path d="M 84 202 Q 320 178 556 202 L 556 216 Q 320 192 84 216 Z" class="wood-dark" />
+
+          <!-- arms -->
+          <path d="M 74 108 Q 60 160 70 232 L 92 232 Q 84 162 96 112 Z" class="wood" />
+          <path d="M 566 108 Q 580 160 570 232 L 548 232 Q 556 162 544 112 Z" class="wood" />
+
+          <!-- back cushions -->
+          <rect x="118" y="146" width="150" height="66" rx="26" class="fabric-dark" />
+          <rect x="118" y="140" width="150" height="66" rx="26" class="fabric" />
+          <rect x="282" y="146" width="150" height="66" rx="26" class="fabric-dark" />
+          <rect x="282" y="140" width="150" height="66" rx="26" class="fabric" />
+          <!-- bolster on chaise end -->
+          <g>
+            <rect x="446" y="150" width="96" height="56" rx="28" class="fabric-dark" />
+            <rect x="446" y="144" width="96" height="56" rx="28" class="fabric" />
+            <ellipse cx="494" cy="172" rx="14" ry="14" class="fabric-dark" opacity="0.35" />
+          </g>
+
+          <!-- seat rail -->
+          <rect x="86" y="228" width="468" height="14" rx="6" class="wood-dark" />
+
+          <!-- seat cushion (chaise extends right) -->
+          <path d="M 96 200 Q 320 188 544 200 L 556 236 Q 320 224 84 236 Z" class="fabric-dark" opacity="0" />
+          <rect x="94" y="204" width="452" height="34" rx="14" class="fabric-dark" />
+          <rect x="94" y="198" width="452" height="34" rx="14" class="fabric" />
+          <line x1="248" y1="202" x2="248" y2="228" class="fabric-seam" />
+          <line x1="398" y1="202" x2="398" y2="228" class="fabric-seam" />
+
+          <!-- legs -->
+          <path d="M 104 242 L 96 322 L 110 322 L 118 242 Z" class="wood" />
+          <path d="M 536 242 L 544 322 L 530 322 L 522 242 Z" class="wood" />
+          <path d="M 300 242 L 296 316 L 308 316 L 312 242 Z" class="wood-dark" />
+          <!-- angled back legs -->
+          <path d="M 132 242 L 148 318 L 160 318 L 146 242 Z" class="wood-dark" />
+          <path d="M 508 242 L 492 318 L 480 318 L 494 242 Z" class="wood-dark" />
+        </svg>
+        <p class="config-line" id="summary-sofa"></p>
+      </div>
+
+      <!-- RF1904 Sideways Lounge Chair -->
+      <div class="product-card" id="card-chair" data-product="chair" tabindex="0" role="button" aria-pressed="false">
+        <h2>RF1904 Sideways Loungefåtölj</h2>
+        <svg viewBox="0 0 400 360" class="furniture" id="svg-chair" aria-label="Illustration av Sideways-fåtöljen">
+          <defs>
+            <pattern id="cord-chair" width="8" height="10" patternUnits="userSpaceOnUse">
+              <rect width="8" height="10" class="p-cord" />
+              <line x1="4" y1="0" x2="4" y2="10" class="p-cord-line" />
+            </pattern>
+          </defs>
+
+          <ellipse cx="200" cy="330" rx="150" ry="15" class="shadow" />
+
+          <!-- back frame with cord -->
+          <path d="M 80 118 Q 200 94 320 118 L 320 206 Q 200 186 80 206 Z" fill="url(#cord-chair)" />
+          <path d="M 74 110 Q 200 86 326 110 L 326 124 Q 200 100 74 124 Z" class="wood" />
+          <path d="M 74 200 Q 200 178 326 200 L 326 214 Q 200 192 74 214 Z" class="wood-dark" />
+
+          <!-- arms -->
+          <path d="M 64 106 Q 50 160 60 232 L 82 232 Q 74 162 86 110 Z" class="wood" />
+          <path d="M 336 106 Q 350 160 340 232 L 318 232 Q 326 162 314 110 Z" class="wood" />
+
+          <!-- back cushion -->
+          <rect x="106" y="148" width="188" height="66" rx="26" class="fabric-dark" />
+          <rect x="106" y="142" width="188" height="66" rx="26" class="fabric" />
+
+          <!-- seat rail -->
+          <rect x="76" y="228" width="248" height="14" rx="6" class="wood-dark" />
+
+          <!-- seat cushion -->
+          <rect x="86" y="204" width="228" height="34" rx="14" class="fabric-dark" />
+          <rect x="86" y="198" width="228" height="34" rx="14" class="fabric" />
+
+          <!-- legs -->
+          <path d="M 94 242 L 86 322 L 100 322 L 108 242 Z" class="wood" />
+          <path d="M 306 242 L 314 322 L 300 322 L 292 242 Z" class="wood" />
+          <path d="M 122 242 L 138 318 L 150 318 L 136 242 Z" class="wood-dark" />
+          <path d="M 278 242 L 262 318 L 250 318 L 264 242 Z" class="wood-dark" />
+        </svg>
+        <p class="config-line" id="summary-chair"></p>
+      </div>
+    </section>
+
+    <!-- ==================== Controls ==================== -->
+    <aside class="controls" aria-label="Konfigurera">
+      <div class="control-block">
+        <h3>Produkt att konfigurera</h3>
+        <div class="segmented" id="product-tabs"></div>
+      </div>
+
+      <div class="control-block">
+        <h3>Tyggrupp</h3>
+        <div class="segmented" id="group-tabs"></div>
+      </div>
+
+      <div class="control-block">
+        <h3>Tyg</h3>
+        <div class="chip-row" id="fabric-chips"></div>
+      </div>
+
+      <div class="control-block">
+        <h3>Färg</h3>
+        <div class="swatch-grid" id="color-swatches"></div>
+        <p class="selected-color" id="selected-color-label"></p>
+      </div>
+
+      <div class="control-block">
+        <h3>Träslag &amp; finish</h3>
+        <div class="swatch-grid wood-grid" id="wood-swatches"></div>
+      </div>
+
+      <div class="control-block">
+        <button class="apply-both" id="apply-both">Använd samma val på båda möblerna</button>
+      </div>
+
+      <p class="fineprint">Flätad rygg i naturfärgat pappersgarn på båda modellerna.
+        Färgerna är approximationer av Kvadrat- och Gabriel-tygernas verkliga kulörer.</p>
+    </aside>
+  </main>
+
+  <script src="js/data.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
