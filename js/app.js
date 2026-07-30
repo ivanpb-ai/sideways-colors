@@ -11,6 +11,41 @@ const state = {
   configs: { sofa: defaultConfig(), chair: defaultConfig() },
 };
 
+const LS_STATE = "sideways.configs";
+
+function validConfig(cfg) {
+  try {
+    return !!(cfg && findColor(cfg) && findWood(cfg.woodId));
+  } catch (e) {
+    return false;
+  }
+}
+
+function loadState() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LS_STATE));
+    if (!saved) return;
+    PRODUCTS.forEach((p) => {
+      if (validConfig(saved.configs && saved.configs[p.id])) {
+        state.configs[p.id] = saved.configs[p.id];
+      }
+    });
+    if (PRODUCTS.some((p) => p.id === saved.activeProduct)) {
+      state.activeProduct = saved.activeProduct;
+    }
+  } catch (e) {
+    /* corrupt state — keep defaults */
+  }
+}
+
+function saveState() {
+  try {
+    localStorage.setItem(LS_STATE, JSON.stringify(state));
+  } catch (e) {
+    /* storage full or unavailable */
+  }
+}
+
 // ---------- helpers ----------
 function findGroup(groupId) {
   return FABRIC_GROUPS.find((g) => g.id === groupId);
@@ -156,6 +191,8 @@ function applyConfigToCard(productId) {
   const group = findGroup(cfg.groupId);
   document.getElementById(`summary-${productId}`).textContent =
     `${group.name} · ${fabric.name} ${color.code} (${color.name}) · ${wood.name} · Naturfärgat pappersgarn`;
+
+  if (typeof PhotoMode !== "undefined") PhotoMode.refresh(productId, color.hex);
 }
 
 function renderAll() {
@@ -166,6 +203,7 @@ function renderAll() {
   renderWoodSwatches();
   applyConfigToCard("sofa");
   applyConfigToCard("chair");
+  saveState();
 }
 
 // ---------- events ----------
@@ -191,4 +229,6 @@ document.getElementById("apply-both").addEventListener("click", () => {
   renderAll();
 });
 
+loadState();
+if (typeof PhotoMode !== "undefined") PhotoMode.init();
 renderAll();

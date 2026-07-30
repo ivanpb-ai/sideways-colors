@@ -69,6 +69,22 @@
           <path d="M 132 242 L 148 318 L 160 318 L 146 242 Z" class="wood-dark" />
           <path d="M 508 242 L 492 318 L 480 318 L 494 242 Z" class="wood-dark" />
         </svg>
+        <canvas class="photo-view" hidden></canvas>
+        <p class="photo-hint" hidden>Måla över dynorna/tyget i fotot. Det röda blir tygfärgat.</p>
+        <div class="mask-tools" hidden>
+          <button data-role="brush" class="active" type="button">Pensel</button>
+          <button data-role="erase" type="button">Sudda</button>
+          <label class="size-label">Storlek
+            <input type="range" min="8" max="90" value="36" data-role="size" />
+          </label>
+          <button data-role="clear" type="button">Rensa</button>
+          <button data-role="done" class="primary" type="button">Klar</button>
+        </div>
+        <div class="photo-toolbar">
+          <label class="photo-btn">Ladda upp foto<input type="file" accept="image/*" hidden data-role="upload" /></label>
+          <button data-role="edit-mask" hidden type="button">Måla tygmask</button>
+          <button data-role="remove-photo" hidden type="button">Ta bort foto</button>
+        </div>
         <p class="config-line" id="summary-sofa"></p>
       </div>
 
@@ -111,6 +127,22 @@
           <path d="M 122 242 L 138 318 L 150 318 L 136 242 Z" class="wood-dark" />
           <path d="M 278 242 L 262 318 L 250 318 L 264 242 Z" class="wood-dark" />
         </svg>
+        <canvas class="photo-view" hidden></canvas>
+        <p class="photo-hint" hidden>Måla över dynorna/tyget i fotot. Det röda blir tygfärgat.</p>
+        <div class="mask-tools" hidden>
+          <button data-role="brush" class="active" type="button">Pensel</button>
+          <button data-role="erase" type="button">Sudda</button>
+          <label class="size-label">Storlek
+            <input type="range" min="8" max="90" value="36" data-role="size" />
+          </label>
+          <button data-role="clear" type="button">Rensa</button>
+          <button data-role="done" class="primary" type="button">Klar</button>
+        </div>
+        <div class="photo-toolbar">
+          <label class="photo-btn">Ladda upp foto<input type="file" accept="image/*" hidden data-role="upload" /></label>
+          <button data-role="edit-mask" hidden type="button">Måla tygmask</button>
+          <button data-role="remove-photo" hidden type="button">Ta bort foto</button>
+        </div>
         <p class="config-line" id="summary-chair"></p>
       </div>
     </section>
@@ -149,10 +181,14 @@
 
       <p class="fineprint">Flätad rygg i naturfärgat pappersgarn på båda modellerna.
         Färgerna är approximationer av Kvadrat- och Gabriel-tygernas verkliga kulörer.</p>
+      <p class="fineprint"><b>Fotoläge:</b> Ladda upp (eller dra in) ett produktfoto på ett kort,
+        måla en gång över tyget med penseln – därefter färgas fotot om fotorealistiskt
+        med varje tygval. Foto och mask sparas lokalt i din webbläsare.</p>
     </aside>
   </main>
 
   <script src="js/data.js"></script>
+  <script src="js/photo.js"></script>
   <script src="js/app.js"></script>
 </body>
 </html>
