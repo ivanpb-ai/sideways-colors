@@ -83,7 +83,21 @@ function loadView(productId, viewIdx) {
         ctx.clearRect(0, 0, w, h);
         ctx.drawImage(mask, 0, 0, w, h);
         const maskData = ctx.getImageData(0, 0, w, h);
-        return { w, h, orig, maskData };
+        // mean luminance of the masked (fabric) region — the recolor
+        // normalizes against this so the same swatch renders equally
+        // light regardless of how light each photo's original fabric is
+        const od = orig.data;
+        const md = maskData.data;
+        let sum = 0;
+        let weight = 0;
+        for (let i = 0; i < od.length; i += 4) {
+          const a = md[i + 3] / 255;
+          if (!a) continue;
+          sum += a * (0.2126 * od[i] + 0.7152 * od[i + 1] + 0.0722 * od[i + 2]) / 255;
+          weight += a;
+        }
+        const meanLum = Math.max(0.05, weight ? sum / weight : 0.62);
+        return { w, h, orig, maskData, meanLum };
       }
     );
   }
@@ -106,8 +120,9 @@ function recolor(vc, hex) {
     const a = m[i + 3];
     if (!a) continue;
     const lum = (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
-    // 0.62 ≈ mid-tone reference so the fabric color reads true in even light
-    const f = Math.pow(lum, 0.85) / 0.62;
+    // at lum == meanLum the fabric renders exactly the swatch color;
+    // the exponent softens shadows/highlights slightly
+    const f = Math.pow(lum / vc.meanLum, 0.85);
     const t = a / 255;
     d[i] = d[i] * (1 - t) + Math.min(255, tr * f) * t;
     d[i + 1] = d[i + 1] * (1 - t) + Math.min(255, tg * f) * t;
