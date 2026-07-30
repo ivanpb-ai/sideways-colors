@@ -24,6 +24,8 @@ med fotorealistisk visning baserad på riktiga produktfoton.
   (`public/oiled-oak.avif`, `soaped-oak.avif`, `walnut.avif`,
   se `tools/calibrate-wood.js`), och swatch-knapparna visar riktigt trä
   beskuret ur fotona. Träet färgas om via en egen mask med bevarad ådring.
+- **Spegelvänd:** varje möbel kan spegelvändas (t.ex. för att visa
+  soffan som höger- i stället för vänsterversion).
 - Soffan och fåtöljen konfigureras var för sig, med en knapp för att
   använda samma val på båda. Alla val sparas lokalt i webbläsaren.
 

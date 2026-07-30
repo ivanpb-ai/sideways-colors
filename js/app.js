@@ -15,6 +15,7 @@ const state = {
   activeProduct: "sofa",
   configs: { sofa: defaultConfig("sofa"), chair: defaultConfig("chair") },
   views: { sofa: 0, chair: 0 },
+  flips: { sofa: false, chair: false },
 };
 
 const LS_STATE = "sideways.configs.v2";
@@ -44,6 +45,9 @@ function loadState() {
       }
       const v = saved.views && saved.views[p.id];
       if (Number.isInteger(v) && v >= 0 && v < p.views.length) state.views[p.id] = v;
+      if (saved.flips && typeof saved.flips[p.id] === "boolean") {
+        state.flips[p.id] = saved.flips[p.id];
+      }
     });
     if (PRODUCTS.some((p) => p.id === saved.activeProduct)) {
       state.activeProduct = saved.activeProduct;
@@ -346,6 +350,7 @@ function renderViewThumbs(productId) {
       e.stopPropagation();
       state.views[productId] = idx;
       renderViewThumbs(productId);
+      renderFlip(productId);
       renderPhoto(productId);
       saveState();
     });
@@ -353,12 +358,24 @@ function renderViewThumbs(productId) {
   });
 }
 
+function renderFlip(productId) {
+  const flipped = state.flips[productId];
+  const card = document.getElementById(`card-${productId}`);
+  card.querySelector(".photo-view").classList.toggle("flipped", flipped);
+  card.querySelectorAll(".view-thumbs img").forEach((img) =>
+    img.classList.toggle("flipped", flipped));
+  const btn = card.querySelector("[data-role=flip]");
+  btn.classList.toggle("active", flipped);
+  btn.setAttribute("aria-pressed", String(flipped));
+}
+
 function renderSummary(productId) {
   const cfg = state.configs[productId];
   const fabric = findFabric(cfg.fabricId);
   const color = findColor(cfg);
+  const flip = state.flips[productId] ? " · Spegelvänd" : "";
   document.getElementById(`summary-${productId}`).textContent =
-    `${fabric.name} ${color.code} · ${findWood(cfg).name} · Naturfärgat pappersgarn`;
+    `${fabric.name} ${color.code} · ${findWood(cfg).name} · Naturfärgat pappersgarn${flip}`;
 }
 
 function renderControls() {
@@ -373,6 +390,7 @@ function update() {
   renderControls();
   PRODUCTS.forEach((p) => {
     renderSummary(p.id);
+    renderFlip(p.id);
     renderPhoto(p.id);
   });
 }
@@ -390,6 +408,14 @@ PRODUCTS.forEach((p) => {
       e.preventDefault();
       activate();
     }
+  });
+
+  card.querySelector("[data-role=flip]").addEventListener("click", (e) => {
+    e.stopPropagation();
+    state.flips[p.id] = !state.flips[p.id];
+    renderFlip(p.id);
+    renderSummary(p.id);
+    saveState();
   });
 });
 

@@ -88,6 +88,33 @@ body {
   border-radius: 8px;
 }
 
+.photo-view.flipped { transform: scaleX(-1); }
+.view-thumbs img.flipped { transform: scaleX(-1); }
+
+.view-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.flip-btn {
+  padding: 6px 12px;
+  font-size: 12px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--bg);
+  cursor: pointer;
+  color: var(--ink);
+  white-space: nowrap;
+}
+.flip-btn:hover { border-color: var(--accent); }
+.flip-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
 .view-thumbs {
   display: flex;
   gap: 8px;
