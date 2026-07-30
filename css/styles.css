@@ -208,6 +208,15 @@ body {
   padding: 3px 0 2px;
 }
 
+.wood-grid { grid-template-columns: repeat(5, 1fr); }
+.wood-swatch { padding: 4px; }
+.wood-block {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1.4;
+  border-radius: 6px;
+}
+
 .selected-color {
   margin-top: 10px;
   font-size: 13px;

@@ -18,8 +18,11 @@ med fotorealistisk visning baserad på riktiga produktfoton.
   grupperade per tyg i väljaren och sorterade efter färgnummer.
   Färgproverna är beskurna ur Carl Hansens tygbilder, färgnumren är lästa
   ur provbildernas etiketter och varje kulör mäts som provets medelfärg.
+- **5 träfinisher:** ek olja (fotonas original), ek såpa, ek vitolja,
+  ek rökfärgad olja och valnöt olja. Träet färgas om via en egen mask
+  med bevarad ådring; kulörerna är approximationer.
 - Soffan och fåtöljen konfigureras var för sig, med en knapp för att
-  använda samma tyg på båda. Alla val sparas lokalt i webbläsaren.
+  använda samma val på båda. Alla val sparas lokalt i webbläsaren.
 
 ## Kör appen
 
@@ -37,8 +40,8 @@ python3 -m http.server 8000
 ## Så fungerar omfärgningen
 
 1. `tools/make-masks.js` klassificerar varje pixel i produktfotona som
-   tyg eller trä/bakgrund (HSV-regler per foto, med skuggbortfall och
-   despeckling) och sparar mjuka masker i `public/masks/`.
+   tyg, trä eller bakgrund (HSV-regler per foto, med skuggbortfall och
+   despeckling) och sparar mjuka tyg- och trämasker i `public/masks/`.
 2. Tygpipelinen: `tools/extract-all.js` hittar alla provrutor i
    skärmbilderna och beskär rena tiles, `tools/dedupe.js` tar bort
    dubbletter från överlappande karusellsidor (perceptuell hash),

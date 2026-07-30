@@ -16,9 +16,9 @@ const PRODUCTS = [
     short: "Soffa",
     tileSize: 96, // px the 512px fabric tile is drawn at (weave scale)
     views: [
-      { label: "Framifrån", photo: "public/sideways-sofa-1.avif", mask: "public/masks/sideways-sofa-1-mask.png" },
-      { label: "Snett framifrån", photo: "public/sideways-sofa-2.avif", mask: "public/masks/sideways-sofa-2-mask.png" },
-      { label: "Bakifrån", photo: "public/sideways-sofa-3.avif", mask: "public/masks/sideways-sofa-3-mask.png" },
+      { label: "Framifrån", photo: "public/sideways-sofa-1.avif", mask: "public/masks/sideways-sofa-1-mask.png", wood: "public/masks/sideways-sofa-1-wood.png" },
+      { label: "Snett framifrån", photo: "public/sideways-sofa-2.avif", mask: "public/masks/sideways-sofa-2-mask.png", wood: "public/masks/sideways-sofa-2-wood.png" },
+      { label: "Bakifrån", photo: "public/sideways-sofa-3.avif", mask: "public/masks/sideways-sofa-3-mask.png", wood: "public/masks/sideways-sofa-3-wood.png" },
     ],
   },
   {
@@ -27,10 +27,20 @@ const PRODUCTS = [
     short: "Fåtölj",
     tileSize: 128,
     views: [
-      { label: "Framifrån", photo: "public/sideways-chair-1.png", mask: "public/masks/sideways-chair-1-mask.png" },
-      { label: "Snett framifrån", photo: "public/sideways-chair-2.png", mask: "public/masks/sideways-chair-2-mask.png" },
+      { label: "Framifrån", photo: "public/sideways-chair-1.png", mask: "public/masks/sideways-chair-1-mask.png", wood: "public/masks/sideways-chair-1-wood.png" },
+      { label: "Snett framifrån", photo: "public/sideways-chair-2.png", mask: "public/masks/sideways-chair-2-mask.png", wood: "public/masks/sideways-chair-2-wood.png" },
     ],
   },
+];
+
+// Wood finishes. hex null = the photos' original oiled oak is shown as-is;
+// other finishes re-tint the wood mask while keeping the grain.
+const WOOD_FINISHES = [
+  { id: "oak-oil", name: "Ek, olja", hex: null, swatch: "#c99a63" },
+  { id: "oak-soap", name: "Ek, s\u00e5pa", hex: "#d3c4a4", swatch: "#d3c4a4" },
+  { id: "oak-white-oil", name: "Ek, vitolja", hex: "#ddccab", swatch: "#ddccab" },
+  { id: "oak-smoked", name: "Ek, r\u00f6kf\u00e4rgad olja", hex: "#6f4f38", swatch: "#6f4f38" },
+  { id: "walnut-oil", name: "Valn\u00f6t, olja", hex: "#5e4534", swatch: "#5e4534" },
 ];
 
 const FABRICS = [
