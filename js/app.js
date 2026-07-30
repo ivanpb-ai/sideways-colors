@@ -83,50 +83,79 @@ function loadView(productId, viewIdx) {
         ctx.clearRect(0, 0, w, h);
         ctx.drawImage(mask, 0, 0, w, h);
         const maskData = ctx.getImageData(0, 0, w, h);
-        // mean luminance of the masked (fabric) region — the recolor
-        // normalizes against this so the same swatch renders equally
-        // light regardless of how light each photo's original fabric is
-        const od = orig.data;
+        // Macro-shading map: lightly blurred so the photo contributes
+        // folds and seam shadows while its own weave micro-texture is
+        // suppressed (the fabric tile supplies the weave instead).
+        ctx.clearRect(0, 0, w, h);
+        ctx.filter = "blur(2px)";
+        ctx.drawImage(photo, 0, 0, w, h);
+        ctx.filter = "none";
+        const bd = ctx.getImageData(0, 0, w, h).data;
+        const lumMap = new Float32Array(w * h);
+        for (let p = 0; p < lumMap.length; p++) {
+          const i = p * 4;
+          lumMap[p] = (0.2126 * bd[i] + 0.7152 * bd[i + 1] + 0.0722 * bd[i + 2]) / 255;
+        }
+        // mean fabric luminance — normalizing against it makes the same
+        // swatch render equally light on every photo
         const md = maskData.data;
         let sum = 0;
         let weight = 0;
-        for (let i = 0; i < od.length; i += 4) {
-          const a = md[i + 3] / 255;
+        for (let p = 0; p < lumMap.length; p++) {
+          const a = md[p * 4 + 3] / 255;
           if (!a) continue;
-          sum += a * (0.2126 * od[i] + 0.7152 * od[i + 1] + 0.0722 * od[i + 2]) / 255;
+          sum += a * lumMap[p];
           weight += a;
         }
         const meanLum = Math.max(0.05, weight ? sum / weight : 0.62);
-        return { w, h, orig, maskData, meanLum };
+        return { w, h, orig, maskData, lumMap, meanLum };
       }
     );
   }
   return viewCache[key];
 }
 
-function hexToRgb(hex) {
-  const n = parseInt(hex.slice(1), 16);
-  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
+// Fabric tiles, cached per "path@size" as tileable ImageData.
+const tileCache = {};
+
+function loadTile(path, size) {
+  const key = `${path}@${size}`;
+  if (!tileCache[key]) {
+    tileCache[key] = loadImage(path).then((img) => {
+      const c = document.createElement("canvas");
+      c.width = size;
+      c.height = size;
+      c.getContext("2d").drawImage(img, 0, 0, size, size);
+      return c.getContext("2d").getImageData(0, 0, size, size);
+    });
+  }
+  return tileCache[key];
 }
 
-// Re-tint masked pixels: keep the photo's luminance (shadows, weave,
-// folds), replace the chroma with the fabric color.
-function recolor(vc, hex) {
+// Drape the fabric tile over the masked pixels: the tile supplies color
+// and weave, the photo's blurred luminance supplies folds and shadows.
+function recolor(vc, tile) {
   const out = new ImageData(new Uint8ClampedArray(vc.orig.data), vc.w, vc.h);
   const d = out.data;
   const m = vc.maskData.data;
-  const [tr, tg, tb] = hexToRgb(hex);
-  for (let i = 0; i < d.length; i += 4) {
-    const a = m[i + 3];
-    if (!a) continue;
-    const lum = (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
-    // at lum == meanLum the fabric renders exactly the swatch color;
-    // the exponent softens shadows/highlights slightly
-    const f = Math.pow(lum / vc.meanLum, 0.85);
-    const t = a / 255;
-    d[i] = d[i] * (1 - t) + Math.min(255, tr * f) * t;
-    d[i + 1] = d[i + 1] * (1 - t) + Math.min(255, tg * f) * t;
-    d[i + 2] = d[i + 2] * (1 - t) + Math.min(255, tb * f) * t;
+  const td = tile.data;
+  const ts = tile.width;
+  for (let y = 0; y < vc.h; y++) {
+    const trow = (y % ts) * ts;
+    for (let x = 0; x < vc.w; x++) {
+      const p = y * vc.w + x;
+      const i = p * 4;
+      const a = m[i + 3];
+      if (!a) continue;
+      // at lum == meanLum the fabric renders the tile as-is;
+      // the exponent softens shadows/highlights slightly
+      const f = Math.pow(vc.lumMap[p] / vc.meanLum, 0.85);
+      const ti = (trow + (x % ts)) * 4;
+      const t = a / 255;
+      d[i] = d[i] * (1 - t) + Math.min(255, td[ti] * f) * t;
+      d[i + 1] = d[i + 1] * (1 - t) + Math.min(255, td[ti + 1] * f) * t;
+      d[i + 2] = d[i + 2] * (1 - t) + Math.min(255, td[ti + 2] * f) * t;
+    }
   }
   return out;
 }
@@ -138,12 +167,16 @@ async function renderPhoto(productId) {
   const color = findColor(state.configs[productId]);
   const token = `${viewIdx}/${color.code}/${state.configs[productId].fabricId}`;
   renderToken[productId] = token;
-  const vc = await loadView(productId, viewIdx);
+  const product = findProduct(productId);
+  const [vc, tile] = await Promise.all([
+    loadView(productId, viewIdx),
+    loadTile(color.tile, product.tileSize),
+  ]);
   if (renderToken[productId] !== token) return; // superseded meanwhile
   const canvas = document.querySelector(`#card-${productId} .photo-view`);
   canvas.width = vc.w;
   canvas.height = vc.h;
-  canvas.getContext("2d").putImageData(recolor(vc, color.hex), 0, 0);
+  canvas.getContext("2d").putImageData(recolor(vc, tile), 0, 0);
 }
 
 // ---------- controls rendering ----------

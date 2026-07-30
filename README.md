@@ -6,10 +6,11 @@ med fotorealistisk visning baserad på riktiga produktfoton.
 
 ## Funktioner
 
-- **Fotorealistisk omfärgning:** produktfotona (`public/`) färgas om direkt
-  i webbläsaren. Omfärgningen bevarar fotots ljus, skuggor och tygstruktur
-  (luminansen behålls, kulören byts) så resultatet ser ut som ett riktigt
-  produktfoto. Ek-stommen och pappersgarnet påverkas inte.
+- **Fotorealistisk omfärgning med vävstruktur:** produktfotona (`public/`)
+  färgas om direkt i webbläsaren. Tygprovets väv och kulör draperas över
+  tygytorna, medan fotots ljus, skuggor och veck bevaras – så resultatet
+  ser ut som ett riktigt produktfoto även för grova vävar som Capture och
+  Canvas Natur. Ek-stommen och pappersgarnet påverkas inte.
 - **Flera vyer:** soffan har tre vyer (framifrån, snett framifrån, bakifrån)
   och fåtöljen två. Även tyget som syns mellan ryggens träribbor färgas om.
 - **8 tyger med riktiga tygprover:** Canvas 2, Canvas Natur, Capture,
@@ -39,9 +40,12 @@ python3 -m http.server 8000
    despeckling) och sparar mjuka masker i `public/masks/`.
 2. `tools/extract-swatches.js` hittar tygproverna i skärmbilderna,
    beskär rena provrutor till `public/fabrics/` och mäter medelfärgen.
-3. I appen ritas fotot till en canvas; för maskerade pixlar behålls
-   fotots luminans men kulören ersätts med tygprovets färg
-   (`js/app.js`, funktionen `recolor`).
+3. I appen ritas fotot till en canvas. För maskerade pixlar hämtas färg
+   och väv från tygprovet (kaklat i produktanpassad skala), som moduleras
+   med fotots lätt utsuddade luminans – fotot bidrar med veck och skuggor,
+   tygprovet med väv och kulör (`js/app.js`, funktionen `recolor`).
+   Luminansen normaliseras mot varje fotos egen tygyta så att samma prov
+   blir exakt lika ljust på soffan och fåtöljen.
 
 Skripten körs med Node + Playwright (`npm i playwright`) och behöver bara
 köras om ifall foton eller tygbilder byts ut.

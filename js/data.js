@@ -14,6 +14,7 @@ const PRODUCTS = [
     id: "sofa",
     name: "RF1903-L Sideways Soffa",
     short: "Soffa",
+    tileSize: 96, // px the 512px fabric tile is drawn at (weave scale)
     views: [
       { label: "Framifrån", photo: "public/sideways-sofa-1.avif", mask: "public/masks/sideways-sofa-1-mask.png" },
       { label: "Snett framifrån", photo: "public/sideways-sofa-2.avif", mask: "public/masks/sideways-sofa-2-mask.png" },
@@ -24,6 +25,7 @@ const PRODUCTS = [
     id: "chair",
     name: "RF1904 Sideways Loungefåtölj",
     short: "Fåtölj",
+    tileSize: 128,
     views: [
       { label: "Framifrån", photo: "public/sideways-chair-1.png", mask: "public/masks/sideways-chair-1-mask.png" },
       { label: "Snett framifrån", photo: "public/sideways-chair-2.png", mask: "public/masks/sideways-chair-2-mask.png" },
