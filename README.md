@@ -13,10 +13,11 @@ med fotorealistisk visning baserad på riktiga produktfoton.
   Canvas Natur. Ek-stommen och pappersgarnet påverkas inte.
 - **Flera vyer:** soffan har tre vyer (framifrån, snett framifrån, bakifrån)
   och fåtöljen två. Även tyget som syns mellan ryggens träribbor färgas om.
-- **8 tyger med riktiga tygprover:** Canvas 2, Canvas Natur, Capture,
-  Clara 2, Fiord 2, Mood, Remix 3 och Re-wool. Färgproverna i väljaren är
-  beskurna ur Carl Hansens tygbilder och varje kulör hämtas som provets
-  uppmätta medelfärg.
+- **10 tyger, 326 kulörer:** Canvas 2, Canvas Natur, Capture, Clara 2,
+  Divina Melange 3, Fiord 2, Hallingdal 65, Mood, Remix 3 och Re-wool,
+  grupperade per tyg i väljaren och sorterade efter färgnummer.
+  Färgproverna är beskurna ur Carl Hansens tygbilder, färgnumren är lästa
+  ur provbildernas etiketter och varje kulör mäts som provets medelfärg.
 - Soffan och fåtöljen konfigureras var för sig, med en knapp för att
   använda samma tyg på båda. Alla val sparas lokalt i webbläsaren.
 
@@ -38,8 +39,12 @@ python3 -m http.server 8000
 1. `tools/make-masks.js` klassificerar varje pixel i produktfotona som
    tyg eller trä/bakgrund (HSV-regler per foto, med skuggbortfall och
    despeckling) och sparar mjuka masker i `public/masks/`.
-2. `tools/extract-swatches.js` hittar tygproverna i skärmbilderna,
-   beskär rena provrutor till `public/fabrics/` och mäter medelfärgen.
+2. Tygpipelinen: `tools/extract-all.js` hittar alla provrutor i
+   skärmbilderna och beskär rena tiles, `tools/dedupe.js` tar bort
+   dubbletter från överlappande karusellsidor (perceptuell hash),
+   `tools/ocr.js` läser färgnumren ur etiketterna (tesseract.js) och
+   `tools/build-fabrics.js` applicerar manuellt verifierade korrigeringar
+   och bygger `public/fabrics/` + tyglistan i `js/data.js`.
 3. I appen ritas fotot till en canvas. För maskerade pixlar hämtas färg
    och väv från tygprovet (kaklat i produktanpassad skala), som moduleras
    med fotots lätt utsuddade luminans – fotot bidrar med veck och skuggor,

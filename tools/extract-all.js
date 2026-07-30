@@ -1,18 +1,21 @@
-// Detect swatch squares in the fabric screenshots, crop clean tiles
-// (avoiding the label text in the lower-left), compute average colors.
+// Extract every swatch from every fabric screenshot: tile, label crop,
+// average color, and a 16x16 luminance hash for dedup.
 const { chromium } = require('playwright');
 const fs = require('fs');
 
-const FILES = ['canvas', 'canvas-nature', 'capture', 'clara', 'fiord', 'mood', 'remix', 'rewool'];
+const files = fs.readdirSync('/home/user/sideways-colors/public')
+  .filter(f => /^(canvas|canvas-nature|capture|clara|divina-melange|fiord|hallingdal|mood|remix|rewool)(-\d+)?\.png$/.test(f))
+  .sort();
+
+const catOf = (f) => f.replace(/(-\d+)?\.png$/, '');
 
 (async () => {
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
   const page = await browser.newPage();
-  fs.mkdirSync('/home/user/sideways-colors/public/fabrics', { recursive: true });
-  const results = {};
+  const all = [];
 
-  for (const name of FILES) {
-    const b64 = fs.readFileSync(`/home/user/sideways-colors/public/${name}.png`).toString('base64');
+  for (const file of files) {
+    const b64 = fs.readFileSync(`/home/user/sideways-colors/public/${file}`).toString('base64');
     const out = await page.evaluate(async (b64) => {
       const img = new Image();
       img.src = 'data:image/png;base64,' + b64;
@@ -27,14 +30,12 @@ const FILES = ['canvas', 'canvas-nature', 'capture', 'clara', 'fiord', 'mood', '
         const r = data[i], g = data[i + 1], b = data[i + 2], a = data[i + 3];
         return a < 128 || (r > 235 && g > 235 && b > 235);
       };
-      // column projection: fraction of non-background pixels
       const colFrac = new Array(W).fill(0);
       for (let px = 0; px < W; px++) {
         let n = 0;
         for (let py = 0; py < H; py += 2) if (!isBg((py * W + px) * 4)) n++;
         colFrac[px] = n / (H / 2);
       }
-      // find horizontal runs of columns that are mostly content
       const runs = [];
       let start = null;
       for (let px = 0; px < W; px++) {
@@ -42,7 +43,6 @@ const FILES = ['canvas', 'canvas-nature', 'capture', 'clara', 'fiord', 'mood', '
         else if (start !== null) { if (px - start > 100) runs.push([start, px]); start = null; }
       }
       if (start !== null && W - start > 100) runs.push([start, W]);
-      // vertical extent per run
       const boxes = runs.map(([x0, x1]) => {
         const mid = Math.floor((x0 + x1) / 2);
         let y0 = null, y1 = null;
@@ -51,9 +51,7 @@ const FILES = ['canvas', 'canvas-nature', 'capture', 'clara', 'fiord', 'mood', '
         }
         return { x0, x1, y0, y1 };
       });
-      // crop a clean tile: inset 8px; take a square from the TOP part
-      // (label text sits in the lower-left), then average color
-      const tiles = boxes.map((b) => {
+      return boxes.map((b) => {
         const inset = 8;
         const bw = b.x1 - b.x0 - inset * 2;
         const bh = b.y1 - b.y0 - inset * 2;
@@ -67,19 +65,38 @@ const FILES = ['canvas', 'canvas-nature', 'capture', 'clara', 'fiord', 'mood', '
         let r = 0, g = 0, bl = 0, n = 0;
         for (let i = 0; i < td.length; i += 16) { r += td[i]; g += td[i + 1]; bl += td[i + 2]; n++; }
         const hex = '#' + [r, g, bl].map(v => Math.round(v / n).toString(16).padStart(2, '0')).join('');
-        return { dataURL: t.toDataURL('image/jpeg', 0.9), hex, box: b };
+        // 16x16 luminance hash for dedup
+        const hcv = document.createElement('canvas');
+        hcv.width = 16; hcv.height = 16;
+        hcv.getContext('2d').drawImage(t, 0, 0, 16, 16);
+        const hd = hcv.getContext('2d').getImageData(0, 0, 16, 16).data;
+        const hash = [];
+        for (let i = 0; i < hd.length; i += 4) {
+          hash.push(Math.round(0.2126 * hd[i] + 0.7152 * hd[i + 1] + 0.0722 * hd[i + 2]));
+        }
+        // label crop: bottom-left area, upscaled 3x for OCR
+        const lw = Math.floor((b.x1 - b.x0) * 0.6);
+        const lh = Math.floor((b.y1 - b.y0) * 0.24);
+        const lx = b.x0 + Math.floor((b.x1 - b.x0) * 0.03);
+        const ly = b.y1 - lh - Math.floor((b.y1 - b.y0) * 0.03);
+        const lc = document.createElement('canvas');
+        lc.width = lw * 3; lc.height = lh * 3;
+        const lctx = lc.getContext('2d');
+        lctx.imageSmoothingEnabled = true;
+        lctx.drawImage(img, lx, ly, lw, lh, 0, 0, lw * 3, lh * 3);
+        return { tile: t.toDataURL('image/jpeg', 0.9), label: lc.toDataURL('image/png'), hex, hash };
       });
-      return tiles;
     }, b64);
 
-    results[name] = out.map((t, i) => {
-      const file = `${name}-${i + 1}.jpg`;
-      fs.writeFileSync(`/home/user/sideways-colors/public/fabrics/${file}`,
-        Buffer.from(t.dataURL.split(',')[1], 'base64'));
-      return { file, hex: t.hex, box: t.box };
+    out.forEach((s, i) => {
+      const id = `${file.replace('.png', '')}_${i}`;
+      fs.writeFileSync(`swatch-work/${id}.jpg`, Buffer.from(s.tile.split(',')[1], 'base64'));
+      fs.writeFileSync(`swatch-work/${id}-label.png`, Buffer.from(s.label.split(',')[1], 'base64'));
+      all.push({ id, file, category: catOf(file), hex: s.hex, hash: s.hash });
     });
-    console.log(name, JSON.stringify(results[name].map(r => ({ f: r.file, hex: r.hex }))));
+    console.log(file, out.length);
   }
-  fs.writeFileSync('swatches.json', JSON.stringify(results, null, 2));
+  fs.writeFileSync('swatch-work/index.json', JSON.stringify(all));
+  console.log('total swatches:', all.length);
   await browser.close();
 })();

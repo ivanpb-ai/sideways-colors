@@ -127,6 +127,8 @@ body {
   align-self: start;
   position: sticky;
   top: 20px;
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
 }
 .control-block { margin-bottom: 22px; }
 .control-block h3 {

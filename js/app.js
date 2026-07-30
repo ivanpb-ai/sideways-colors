@@ -18,9 +18,11 @@ const LS_STATE = "sideways.configs.v2";
 function findFabric(fabricId) {
   return FABRICS.find((f) => f.id === fabricId);
 }
+// cfg.code holds the color's unique id (equal to the printed code except
+// for source-label duplicates, e.g. Divina Melange "0457b")
 function findColor(cfg) {
   const fabric = findFabric(cfg.fabricId);
-  return fabric && fabric.colors.find((c) => c.code === cfg.code);
+  return fabric && fabric.colors.find((c) => c.id === cfg.code);
 }
 function findProduct(productId) {
   return PRODUCTS.find((p) => p.id === productId);
@@ -212,7 +214,7 @@ function renderFabricChips() {
     btn.classList.toggle("active", cfg.fabricId === f.id);
     btn.addEventListener("click", () => {
       cfg.fabricId = f.id;
-      cfg.code = f.colors[0].code;
+      cfg.code = f.colors[0].id;
       update();
     });
     el.appendChild(btn);
@@ -230,16 +232,17 @@ function renderColorSwatches() {
     btn.className = "swatch";
     btn.title = `${fabric.name} ${c.code}`;
     btn.setAttribute("aria-label", btn.title);
-    btn.classList.toggle("active", cfg.code === c.code);
+    btn.classList.toggle("active", cfg.code === c.id);
     const img = document.createElement("img");
     img.src = c.tile;
     img.alt = "";
+    img.loading = "lazy";
     btn.appendChild(img);
     const label = document.createElement("span");
     label.textContent = c.code;
     btn.appendChild(label);
     btn.addEventListener("click", () => {
-      cfg.code = c.code;
+      cfg.code = c.id;
       update();
     });
     el.appendChild(btn);
@@ -277,8 +280,9 @@ function renderViewThumbs(productId) {
 function renderSummary(productId) {
   const cfg = state.configs[productId];
   const fabric = findFabric(cfg.fabricId);
+  const color = findColor(cfg);
   document.getElementById(`summary-${productId}`).textContent =
-    `${fabric.name} ${cfg.code} · Ek · Naturfärgat pappersgarn`;
+    `${fabric.name} ${color.code} · Ek · Naturfärgat pappersgarn`;
 }
 
 function renderControls() {
