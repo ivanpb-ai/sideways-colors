@@ -1,24 +1,29 @@
-/* Sideways color configurator */
+/* Sideways color configurator — photo-based rendering */
 
 // ---------- state ----------
-function defaultConfig() {
-  // The reference variant: oak oil, Fiord 551, natural cord
-  return { groupId: "group3", fabricId: "fiord2", colorCode: "551", woodId: "oak-oil" };
+function defaultConfig(productId) {
+  return productId === "sofa"
+    ? { fabricId: "fiord", code: "0101" }
+    : { fabricId: "clara", code: "0144" };
 }
 
 const state = {
   activeProduct: "sofa",
-  configs: { sofa: defaultConfig(), chair: defaultConfig() },
+  configs: { sofa: defaultConfig("sofa"), chair: defaultConfig("chair") },
+  views: { sofa: 0, chair: 0 },
 };
 
-const LS_STATE = "sideways.configs";
+const LS_STATE = "sideways.configs.v2";
 
-function validConfig(cfg) {
-  try {
-    return !!(cfg && findColor(cfg) && findWood(cfg.woodId));
-  } catch (e) {
-    return false;
-  }
+function findFabric(fabricId) {
+  return FABRICS.find((f) => f.id === fabricId);
+}
+function findColor(cfg) {
+  const fabric = findFabric(cfg.fabricId);
+  return fabric && fabric.colors.find((c) => c.code === cfg.code);
+}
+function findProduct(productId) {
+  return PRODUCTS.find((p) => p.id === productId);
 }
 
 function loadState() {
@@ -26,9 +31,10 @@ function loadState() {
     const saved = JSON.parse(localStorage.getItem(LS_STATE));
     if (!saved) return;
     PRODUCTS.forEach((p) => {
-      if (validConfig(saved.configs && saved.configs[p.id])) {
-        state.configs[p.id] = saved.configs[p.id];
-      }
+      const cfg = saved.configs && saved.configs[p.id];
+      if (cfg && findColor(cfg)) state.configs[p.id] = cfg;
+      const v = saved.views && saved.views[p.id];
+      if (Number.isInteger(v) && v >= 0 && v < p.views.length) state.views[p.id] = v;
     });
     if (PRODUCTS.some((p) => p.id === saved.activeProduct)) {
       state.activeProduct = saved.activeProduct;
@@ -42,34 +48,90 @@ function saveState() {
   try {
     localStorage.setItem(LS_STATE, JSON.stringify(state));
   } catch (e) {
-    /* storage full or unavailable */
+    /* storage unavailable */
   }
 }
 
-// ---------- helpers ----------
-function findGroup(groupId) {
-  return FABRIC_GROUPS.find((g) => g.id === groupId);
-}
-function findFabric(groupId, fabricId) {
-  return findGroup(groupId).fabrics.find((f) => f.id === fabricId);
-}
-function findColor(cfg) {
-  return findFabric(cfg.groupId, cfg.fabricId).colors.find((c) => c.code === cfg.colorCode);
-}
-function findWood(woodId) {
-  return WOOD_FINISHES.find((w) => w.id === woodId);
+// ---------- photo renderer ----------
+const MAX_W = 1400;
+const viewCache = {}; // "product/viewIdx" -> Promise<{w,h,orig,maskData}>
+
+function loadImage(src) {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error(`Kunde inte läsa ${src}`));
+    img.src = src;
+  });
 }
 
-// Darken a hex color by a factor (0..1) for shading cushions/frames.
-function shade(hex, factor) {
+function loadView(productId, viewIdx) {
+  const key = `${productId}/${viewIdx}`;
+  if (!viewCache[key]) {
+    const view = findProduct(productId).views[viewIdx];
+    viewCache[key] = Promise.all([loadImage(view.photo), loadImage(view.mask)]).then(
+      ([photo, mask]) => {
+        const scale = Math.min(1, MAX_W / photo.naturalWidth);
+        const w = Math.round(photo.naturalWidth * scale);
+        const h = Math.round(photo.naturalHeight * scale);
+        const c = document.createElement("canvas");
+        c.width = w;
+        c.height = h;
+        const ctx = c.getContext("2d");
+        ctx.drawImage(photo, 0, 0, w, h);
+        const orig = ctx.getImageData(0, 0, w, h);
+        ctx.clearRect(0, 0, w, h);
+        ctx.drawImage(mask, 0, 0, w, h);
+        const maskData = ctx.getImageData(0, 0, w, h);
+        return { w, h, orig, maskData };
+      }
+    );
+  }
+  return viewCache[key];
+}
+
+function hexToRgb(hex) {
   const n = parseInt(hex.slice(1), 16);
-  const r = Math.round(((n >> 16) & 255) * factor);
-  const g = Math.round(((n >> 8) & 255) * factor);
-  const b = Math.round((n & 255) * factor);
-  return `#${((r << 16) | (g << 8) | b).toString(16).padStart(6, "0")}`;
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255];
 }
 
-// ---------- rendering ----------
+// Re-tint masked pixels: keep the photo's luminance (shadows, weave,
+// folds), replace the chroma with the fabric color.
+function recolor(vc, hex) {
+  const out = new ImageData(new Uint8ClampedArray(vc.orig.data), vc.w, vc.h);
+  const d = out.data;
+  const m = vc.maskData.data;
+  const [tr, tg, tb] = hexToRgb(hex);
+  for (let i = 0; i < d.length; i += 4) {
+    const a = m[i + 3];
+    if (!a) continue;
+    const lum = (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
+    // 0.62 ≈ mid-tone reference so the fabric color reads true in even light
+    const f = Math.pow(lum, 0.85) / 0.62;
+    const t = a / 255;
+    d[i] = d[i] * (1 - t) + Math.min(255, tr * f) * t;
+    d[i + 1] = d[i + 1] * (1 - t) + Math.min(255, tg * f) * t;
+    d[i + 2] = d[i + 2] * (1 - t) + Math.min(255, tb * f) * t;
+  }
+  return out;
+}
+
+const renderToken = {};
+
+async function renderPhoto(productId) {
+  const viewIdx = state.views[productId];
+  const color = findColor(state.configs[productId]);
+  const token = `${viewIdx}/${color.code}/${state.configs[productId].fabricId}`;
+  renderToken[productId] = token;
+  const vc = await loadView(productId, viewIdx);
+  if (renderToken[productId] !== token) return; // superseded meanwhile
+  const canvas = document.querySelector(`#card-${productId} .photo-view`);
+  canvas.width = vc.w;
+  canvas.height = vc.h;
+  canvas.getContext("2d").putImageData(recolor(vc, color.hex), 0, 0);
+}
+
+// ---------- controls rendering ----------
 function renderProductTabs() {
   const el = document.getElementById("product-tabs");
   el.innerHTML = "";
@@ -79,7 +141,7 @@ function renderProductTabs() {
     btn.classList.toggle("active", state.activeProduct === p.id);
     btn.addEventListener("click", () => {
       state.activeProduct = p.id;
-      renderAll();
+      renderControls();
     });
     el.appendChild(btn);
   });
@@ -92,118 +154,98 @@ function renderProductTabs() {
   });
 }
 
-function renderGroupTabs() {
-  const cfg = state.configs[state.activeProduct];
-  const el = document.getElementById("group-tabs");
-  el.innerHTML = "";
-  FABRIC_GROUPS.forEach((g) => {
-    const btn = document.createElement("button");
-    btn.textContent = g.name.replace("Tyggrupp ", "Grupp ");
-    btn.classList.toggle("active", cfg.groupId === g.id);
-    btn.addEventListener("click", () => {
-      cfg.groupId = g.id;
-      const firstFabric = g.fabrics[0];
-      cfg.fabricId = firstFabric.id;
-      cfg.colorCode = firstFabric.colors[0].code;
-      renderAll();
-    });
-    el.appendChild(btn);
-  });
-}
-
 function renderFabricChips() {
   const cfg = state.configs[state.activeProduct];
-  const group = findGroup(cfg.groupId);
   const el = document.getElementById("fabric-chips");
   el.innerHTML = "";
-  group.fabrics.forEach((f) => {
+  FABRICS.forEach((f) => {
     const btn = document.createElement("button");
-    btn.innerHTML = `${f.name}<span class="maker">${f.maker}</span>`;
+    btn.textContent = f.name;
     btn.classList.toggle("active", cfg.fabricId === f.id);
     btn.addEventListener("click", () => {
       cfg.fabricId = f.id;
-      cfg.colorCode = f.colors[0].code;
-      renderAll();
+      cfg.code = f.colors[0].code;
+      update();
     });
     el.appendChild(btn);
   });
+  document.getElementById("fabric-info").textContent = findFabric(cfg.fabricId).info;
 }
 
 function renderColorSwatches() {
   const cfg = state.configs[state.activeProduct];
-  const fabric = findFabric(cfg.groupId, cfg.fabricId);
+  const fabric = findFabric(cfg.fabricId);
   const el = document.getElementById("color-swatches");
   el.innerHTML = "";
   fabric.colors.forEach((c) => {
     const btn = document.createElement("button");
     btn.className = "swatch";
-    btn.style.background = c.hex;
-    btn.title = `${fabric.name} ${c.code} – ${c.name}`;
+    btn.title = `${fabric.name} ${c.code}`;
     btn.setAttribute("aria-label", btn.title);
-    btn.classList.toggle("active", cfg.colorCode === c.code);
+    btn.classList.toggle("active", cfg.code === c.code);
+    const img = document.createElement("img");
+    img.src = c.tile;
+    img.alt = "";
+    btn.appendChild(img);
+    const label = document.createElement("span");
+    label.textContent = c.code;
+    btn.appendChild(label);
     btn.addEventListener("click", () => {
-      cfg.colorCode = c.code;
-      renderAll();
+      cfg.code = c.code;
+      update();
     });
     el.appendChild(btn);
   });
 
   const color = findColor(cfg);
   document.getElementById("selected-color-label").innerHTML =
-    `Vald: <b>${fabric.name} ${color.code}</b> · ${color.name}`;
+    `Vald: <b>${fabric.name} ${color.code}</b>`;
 }
 
-function renderWoodSwatches() {
-  const cfg = state.configs[state.activeProduct];
-  const el = document.getElementById("wood-swatches");
+function renderViewThumbs(productId) {
+  const product = findProduct(productId);
+  const el = document.querySelector(`#card-${productId} .view-thumbs`);
   el.innerHTML = "";
-  WOOD_FINISHES.forEach((w) => {
+  product.views.forEach((v, idx) => {
     const btn = document.createElement("button");
-    btn.className = "swatch";
-    btn.style.background = `linear-gradient(135deg, ${w.hex}, ${shade(w.hex, 0.82)})`;
-    btn.title = w.name;
-    btn.setAttribute("aria-label", w.name);
-    btn.classList.toggle("active", cfg.woodId === w.id);
-    btn.addEventListener("click", () => {
-      cfg.woodId = w.id;
-      renderAll();
+    btn.title = v.label;
+    btn.setAttribute("role", "tab");
+    btn.classList.toggle("active", state.views[productId] === idx);
+    const img = document.createElement("img");
+    img.src = v.photo;
+    img.alt = v.label;
+    btn.appendChild(img);
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      state.views[productId] = idx;
+      renderViewThumbs(productId);
+      renderPhoto(productId);
+      saveState();
     });
     el.appendChild(btn);
   });
-
-  const label = document.createElement("div");
-  label.className = "wood-label";
-  label.textContent = `Vald: ${findWood(cfg.woodId).name}`;
-  el.appendChild(label);
 }
 
-function applyConfigToCard(productId) {
+function renderSummary(productId) {
   const cfg = state.configs[productId];
-  const card = document.getElementById(`card-${productId}`);
-  const color = findColor(cfg);
-  const wood = findWood(cfg.woodId);
-  card.style.setProperty("--fabric", color.hex);
-  card.style.setProperty("--fabric-dark", shade(color.hex, 0.8));
-  card.style.setProperty("--wood", wood.hex);
-  card.style.setProperty("--wood-dark", shade(wood.hex, 0.78));
-
-  const fabric = findFabric(cfg.groupId, cfg.fabricId);
-  const group = findGroup(cfg.groupId);
+  const fabric = findFabric(cfg.fabricId);
   document.getElementById(`summary-${productId}`).textContent =
-    `${group.name} · ${fabric.name} ${color.code} (${color.name}) · ${wood.name} · Naturfärgat pappersgarn`;
-
-  if (typeof PhotoMode !== "undefined") PhotoMode.refresh(productId, color.hex);
+    `${fabric.name} ${cfg.code} · Ek · Naturfärgat pappersgarn`;
 }
 
-function renderAll() {
+function renderControls() {
   renderProductTabs();
-  renderGroupTabs();
   renderFabricChips();
   renderColorSwatches();
-  renderWoodSwatches();
-  applyConfigToCard("sofa");
-  applyConfigToCard("chair");
   saveState();
+}
+
+function update() {
+  renderControls();
+  PRODUCTS.forEach((p) => {
+    renderSummary(p.id);
+    renderPhoto(p.id);
+  });
 }
 
 // ---------- events ----------
@@ -211,7 +253,7 @@ PRODUCTS.forEach((p) => {
   const card = document.getElementById(`card-${p.id}`);
   const activate = () => {
     state.activeProduct = p.id;
-    renderAll();
+    renderControls();
   };
   card.addEventListener("click", activate);
   card.addEventListener("keydown", (e) => {
@@ -226,9 +268,10 @@ document.getElementById("apply-both").addEventListener("click", () => {
   const src = state.configs[state.activeProduct];
   const other = state.activeProduct === "sofa" ? "chair" : "sofa";
   state.configs[other] = { ...src };
-  renderAll();
+  update();
 });
 
+// ---------- init ----------
 loadState();
-if (typeof PhotoMode !== "undefined") PhotoMode.init();
-renderAll();
+PRODUCTS.forEach((p) => renderViewThumbs(p.id));
+update();

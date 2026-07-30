@@ -1,33 +1,28 @@
 # Sideways färgväljare
 
-En webbapp för att välja tygfärg och träfinish för **RF1903 Sideways Soffa**
-och **RF1904 Sideways Loungefåtölj** (design Rikke Frost för Carl Hansen & Søn).
+En webbapp för att välja tygfärg för **RF1903-L Sideways Soffa** och
+**RF1904 Sideways Loungefåtölj** (design Rikke Frost för Carl Hansen & Søn),
+med fotorealistisk visning baserad på riktiga produktfoton.
 
 ## Funktioner
 
-- Stiliserade illustrationer av båda möblerna som uppdateras direkt när du
-  ändrar tyg, färg eller träslag.
-- Tygvalen är organiserade enligt Carl Hansens tyggrupper:
-  - **Tyggrupp 1:** Clara 2, Remix 3, Capture, Focus Royal, Mood, Passion
-  - **Tyggrupp 2:** Re-wool 2
-  - **Tyggrupp 3:** Fiord 2, Hallingdal 65
-  - **Tyggrupp 4:** Divina Melange 3, Keiga
-- Träfinish: ek olja, ek vitolja, ek rökfärgad olja samt valnöt olja.
-- Soffan och fåtöljen konfigureras var för sig, med en knapp för att kopiera
-  valet till båda.
-- Startläget motsvarar referensvarianten: ek olja, Fiord 551, naturfärgat
-  pappersgarn.
-- **Fotoläge (fotorealistiskt):** ladda upp eller dra in ett riktigt
-  produktfoto på ett produktkort, måla en gång över tyget/dynorna med
-  penselverktyget – därefter färgas fotot om fotorealistiskt för varje
-  tygfärg du väljer. Omfärgningen bevarar fotots ljus, skuggor och
-  tygstruktur (luminansen behålls, kulören byts). Foto, mask och dina
-  färgval sparas lokalt i webbläsaren (localStorage).
+- **Fotorealistisk omfärgning:** produktfotona (`public/`) färgas om direkt
+  i webbläsaren. Omfärgningen bevarar fotots ljus, skuggor och tygstruktur
+  (luminansen behålls, kulören byts) så resultatet ser ut som ett riktigt
+  produktfoto. Ek-stommen och pappersgarnet påverkas inte.
+- **Flera vyer:** soffan har tre vyer (framifrån, snett framifrån, bakifrån)
+  och fåtöljen två. Även tyget som syns mellan ryggens träribbor färgas om.
+- **8 tyger med riktiga tygprover:** Canvas 2, Canvas Natur, Capture,
+  Clara 2, Fiord 2, Mood, Remix 3 och Re-wool. Färgproverna i väljaren är
+  beskurna ur Carl Hansens tygbilder och varje kulör hämtas som provets
+  uppmätta medelfärg.
+- Soffan och fåtöljen konfigureras var för sig, med en knapp för att
+  använda samma tyg på båda. Alla val sparas lokalt i webbläsaren.
 
 ## Kör appen
 
-Ingen byggprocess behövs – öppna `index.html` direkt i webbläsaren, eller
-starta en enkel server:
+Ingen byggprocess behövs, men fotona läses via `fetch`/canvas så appen bör
+serveras över HTTP:
 
 ```sh
 npx serve .
@@ -35,25 +30,34 @@ npx serve .
 python3 -m http.server 8000
 ```
 
-## Fotoläge – tips
+Öppna sedan `http://localhost:8000`.
 
-1. Spara ett produktfoto från t.ex. Carl Hansens produktsida i din
-   webbläsare (högerklicka → spara bild). Välj gärna ett foto där möbeln
-   har ett ljust, jämnt belyst tyg – det ger bäst omfärgningsresultat.
-2. Dra in bilden på soffans eller fåtöljens kort i appen (eller klicka
-   "Ladda upp foto").
-3. Maskeditorn öppnas automatiskt: måla över allt tyg (dynor, bolster).
-   Använd "Sudda" för att korrigera och reglaget för penselstorlek.
-   Klicka "Klar" när du är nöjd – masken behöver bara målas en gång.
-4. Välj tyg och färg som vanligt; fotot färgas om direkt.
+## Så fungerar omfärgningen
 
-Observera att produktfoton från Carl Hansen m.fl. är upphovsrättsskyddade –
-använd dem privat i appen, publicera dem inte vidare.
+1. `tools/make-masks.js` klassificerar varje pixel i produktfotona som
+   tyg eller trä/bakgrund (HSV-regler per foto, med skuggbortfall och
+   despeckling) och sparar mjuka masker i `public/masks/`.
+2. `tools/extract-swatches.js` hittar tygproverna i skärmbilderna,
+   beskär rena provrutor till `public/fabrics/` och mäter medelfärgen.
+3. I appen ritas fotot till en canvas; för maskerade pixlar behålls
+   fotots luminans men kulören ersätts med tygprovets färg
+   (`js/app.js`, funktionen `recolor`).
 
-## Notering om färgerna
+Skripten körs med Node + Playwright (`npm i playwright`) och behöver bara
+köras om ifall foton eller tygbilder byts ut.
 
-Carl Hansens och Kvadrats webbplatser blockerar automatisk hämtning, så
-färgproverna i `js/data.js` är handplockade approximationer av de verkliga
-Kvadrat- och Gabriel-kulörerna (färgnummer och namn kan avvika något från
-den aktuella kollektionen). Justera eller komplettera listorna i
-`js/data.js` – varje färg är bara `{ code, name, hex }`.
+## Struktur
+
+```
+index.html          – sida och layout
+css/styles.css      – stilar
+js/data.js          – produkter, vyer, tyger och kulörer
+js/app.js           – tillstånd, kontroller och omfärgningsmotor
+public/             – produktfoton och tygbilder (från Carl Hansen)
+public/fabrics/     – beskurna tygprover (genererade)
+public/masks/       – tygmasker för fotona (genererade)
+tools/              – genereringsskript för masker och tygprover
+```
+
+Produktfoton och tygbilder är Carl Hansen & Søns material – använd appen
+privat och publicera inte bilderna vidare.
