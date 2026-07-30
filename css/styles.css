@@ -208,12 +208,13 @@ body {
   padding: 3px 0 2px;
 }
 
-.wood-grid { grid-template-columns: repeat(5, 1fr); }
+.wood-grid { grid-template-columns: repeat(3, 1fr); }
 .wood-swatch { padding: 4px; }
 .wood-block {
   display: block;
   width: 100%;
-  aspect-ratio: 1.4;
+  aspect-ratio: 1.8;
+  object-fit: cover;
   border-radius: 6px;
 }
 

@@ -314,11 +314,11 @@ function renderWoodSwatches() {
     btn.title = w.name;
     btn.setAttribute("aria-label", w.name);
     btn.classList.toggle("active", cfg.woodId === w.id);
-    const block = document.createElement("span");
-    block.className = "wood-block";
-    block.style.background =
-      `linear-gradient(115deg, ${w.swatch}, ${shade(w.swatch, 0.85)} 55%, ${w.swatch})`;
-    btn.appendChild(block);
+    const img = document.createElement("img");
+    img.className = "wood-block";
+    img.src = w.swatchImg;
+    img.alt = "";
+    btn.appendChild(img);
     btn.addEventListener("click", () => {
       cfg.woodId = w.id;
       update();
@@ -327,11 +327,6 @@ function renderWoodSwatches() {
   });
   document.getElementById("selected-wood-label").innerHTML =
     `Vald: <b>${findWood(cfg).name}</b>`;
-}
-
-function shade(hex, factor) {
-  const [r, g, b] = hexToRgb(hex).map((v) => Math.round(v * factor));
-  return `rgb(${r},${g},${b})`;
 }
 
 function renderViewThumbs(productId) {

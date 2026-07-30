@@ -33,14 +33,15 @@ const PRODUCTS = [
   },
 ];
 
-// Wood finishes. hex null = the photos' original oiled oak is shown as-is;
-// other finishes re-tint the wood mask while keeping the grain.
+// Wood finishes, calibrated against Carl Hansen's reference photos of the
+// sofa in each finish (public/oiled-oak.avif, soaped-oak.avif, walnut.avif):
+// hex is the measured mean of the wood pixels in the reference photo, and
+// the swatch strip is cropped from its front leg. hex null = the product
+// photos' original oiled oak is shown as-is.
 const WOOD_FINISHES = [
-  { id: "oak-oil", name: "Ek, olja", hex: null, swatch: "#c99a63" },
-  { id: "oak-soap", name: "Ek, s\u00e5pa", hex: "#d3c4a4", swatch: "#d3c4a4" },
-  { id: "oak-white-oil", name: "Ek, vitolja", hex: "#ddccab", swatch: "#ddccab" },
-  { id: "oak-smoked", name: "Ek, r\u00f6kf\u00e4rgad olja", hex: "#6f4f38", swatch: "#6f4f38" },
-  { id: "walnut-oil", name: "Valn\u00f6t, olja", hex: "#5e4534", swatch: "#5e4534" },
+  { id: "oak-oil", name: "Ek, olja", hex: null, swatchImg: "public/wood/oiled-oak.jpg" },
+  { id: "oak-soap", name: "Ek, s\u00e5pa", hex: "#c79562", swatchImg: "public/wood/soaped-oak.jpg" },
+  { id: "walnut-oil", name: "Valn\u00f6t, olja", hex: "#674e3e", swatchImg: "public/wood/walnut.jpg" },
 ];
 
 const FABRICS = [

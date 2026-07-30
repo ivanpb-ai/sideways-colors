@@ -18,9 +18,12 @@ med fotorealistisk visning baserad på riktiga produktfoton.
   grupperade per tyg i väljaren och sorterade efter färgnummer.
   Färgproverna är beskurna ur Carl Hansens tygbilder, färgnumren är lästa
   ur provbildernas etiketter och varje kulör mäts som provets medelfärg.
-- **5 träfinisher:** ek olja (fotonas original), ek såpa, ek vitolja,
-  ek rökfärgad olja och valnöt olja. Träet färgas om via en egen mask
-  med bevarad ådring; kulörerna är approximationer.
+- **3 träfinisher, kalibrerade mot referensfoton:** ek olja (fotonas
+  original), ek såpa och valnöt olja. Kulörerna är uppmätta ur Carl
+  Hansens referensfoton av soffan i respektive finish
+  (`public/oiled-oak.avif`, `soaped-oak.avif`, `walnut.avif`,
+  se `tools/calibrate-wood.js`), och swatch-knapparna visar riktigt trä
+  beskuret ur fotona. Träet färgas om via en egen mask med bevarad ådring.
 - Soffan och fåtöljen konfigureras var för sig, med en knapp för att
   använda samma val på båda. Alla val sparas lokalt i webbläsaren.
 
