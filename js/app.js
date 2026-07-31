@@ -183,32 +183,53 @@ function recolor(vc, tile, woodHex) {
   const td = tile.data;
   const ts = tile.width;
   const wc = woodHex ? hexToRgb(woodHex) : null;
+  const od = vc.orig.data;
   for (let y = 0; y < vc.h; y++) {
     const trow = (y % ts) * ts;
     for (let x = 0; x < vc.w; x++) {
       const p = y * vc.w + x;
       const i = p * 4;
       const af = m[i + 3];
+      const aw = wm[i + 3];
+      if (!af && !aw) continue;
+
+      // fabric target: tile color shaded by the photo's blurred luminance
+      let fr = 0, fg = 0, fb = 0;
       if (af) {
-        // at lum == meanLum the fabric renders the tile as-is;
-        // the exponent softens shadows/highlights slightly
         const f = Math.pow(vc.lumMap[p] / vc.meanLum, 0.85);
         const ti = (trow + (x % ts)) * 4;
-        const t = af / 255;
-        d[i] = d[i] * (1 - t) + Math.min(255, td[ti] * f) * t;
-        d[i + 1] = d[i + 1] * (1 - t) + Math.min(255, td[ti + 1] * f) * t;
-        d[i + 2] = d[i + 2] * (1 - t) + Math.min(255, td[ti + 2] * f) * t;
+        fr = Math.min(255, td[ti] * f);
+        fg = Math.min(255, td[ti + 1] * f);
+        fb = Math.min(255, td[ti + 2] * f);
       }
-      if (wc) {
-        const aw = wm[i + 3];
-        if (!aw) continue;
-        const rawLum = (0.2126 * d[i] + 0.7152 * d[i + 1] + 0.0722 * d[i + 2]) / 255;
+      // wood target: finish color shaded by the photo's raw luminance
+      // (grain); hex null keeps the original oiled oak
+      let wr = od[i], wg = od[i + 1], wb = od[i + 2];
+      if (wc && aw) {
+        const rawLum = (0.2126 * od[i] + 0.7152 * od[i + 1] + 0.0722 * od[i + 2]) / 255;
         const f = Math.pow(rawLum / vc.meanWoodLum, 0.9);
-        // fabric takes precedence where the soft mask edges overlap
-        const t = (aw / 255) * (1 - af / 255);
-        d[i] = d[i] * (1 - t) + Math.min(255, wc[0] * f) * t;
-        d[i + 1] = d[i + 1] * (1 - t) + Math.min(255, wc[1] * f) * t;
-        d[i + 2] = d[i + 2] * (1 - t) + Math.min(255, wc[2] * f) * t;
+        wr = Math.min(255, wc[0] * f);
+        wg = Math.min(255, wc[1] * f);
+        wb = Math.min(255, wc[2] * f);
+      }
+
+      const total = af + aw;
+      if (total >= 230) {
+        // interior boundary (e.g. cord/slat edges in the arm panel):
+        // full replacement with normalized shares, so no original color
+        // bleeds through and shows as flecks against the recolored parts
+        const sF = af / total;
+        const sW = 1 - sF;
+        d[i] = fr * sF + wr * sW;
+        d[i + 1] = fg * sF + wg * sW;
+        d[i + 2] = fb * sF + wb * sW;
+      } else {
+        // soft outer edge: blend against the original for a smooth rim
+        const tF = af / 255;
+        const tW = (aw / 255) * (1 - tF);
+        d[i] = od[i] * (1 - tF - tW) + fr * tF + wr * tW;
+        d[i + 1] = od[i + 1] * (1 - tF - tW) + fg * tF + wg * tW;
+        d[i + 2] = od[i + 2] * (1 - tF - tW) + fb * tF + wb * tW;
       }
     }
   }

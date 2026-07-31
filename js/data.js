@@ -41,6 +41,7 @@ const PRODUCTS = [
 const WOOD_FINISHES = [
   { id: "oak-oil", name: "Ek, olja", hex: null, swatchImg: "public/wood/oiled-oak.jpg" },
   { id: "oak-soap", name: "Ek, s\u00e5pa", hex: "#c79562", swatchImg: "public/wood/soaped-oak.jpg" },
+  { id: "oak-black", name: "Ek, svart", hex: "#23272a", swatchImg: "public/wood/black-oak.jpg" },
   { id: "walnut-oil", name: "Valn\u00f6t, olja", hex: "#674e3e", swatchImg: "public/wood/walnut.jpg" },
 ];
 

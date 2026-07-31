@@ -235,7 +235,7 @@ body {
   padding: 3px 0 2px;
 }
 
-.wood-grid { grid-template-columns: repeat(3, 1fr); }
+.wood-grid { grid-template-columns: repeat(4, 1fr); }
 .wood-swatch { padding: 4px; }
 .wood-block {
   display: block;

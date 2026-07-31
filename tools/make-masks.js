@@ -98,6 +98,31 @@ const PHOTOS = [
       const fabricSoft = clean(fabric);
       const woodSoft = clean(wood);
 
+      // Gap fill: despeckling can drop thin slivers (cord strings between
+      // the arm slats) from BOTH masks, leaving original-color flecks that
+      // clash with recolored surroundings. Assign any still-unmasked
+      // opaque interior pixel to the fabric mask.
+      {
+        const fctx = fabricSoft.getContext('2d');
+        const fdata = fctx.getImageData(0, 0, W, H);
+        const wdata = woodSoft.getContext('2d').getImageData(0, 0, W, H);
+        for (let py = 0; py < H; py++) {
+          if (cutY !== null && py >= cutY) continue;
+          for (let px = 0; px < W; px++) {
+            const i = (py * W + px) * 4;
+            if (d[i + 3] < 250) continue;
+            if (d[i] > 248 && d[i + 1] > 248 && d[i + 2] > 248) continue;
+            const covered = fdata.data[i + 3] + wdata.data[i + 3];
+            if (covered < 200) {
+              const add = Math.min(255, 255 - wdata.data[i + 3]);
+              fdata.data[i] = fdata.data[i + 1] = fdata.data[i + 2] = 255;
+              fdata.data[i + 3] = Math.max(fdata.data[i + 3], add);
+            }
+          }
+        }
+        fctx.putImageData(fdata, 0, 0);
+      }
+
       // preview: red = fabric, blue = wood
       const prev = document.createElement('canvas');
       prev.width = W; prev.height = H;
