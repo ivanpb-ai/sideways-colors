@@ -10,8 +10,27 @@
  */
 
 const PRODUCTS = [
-  { id: "sofa", name: "RF1903-L Sideways Soffa", short: "Soffa" },
-  { id: "chair", name: "RF1904 Sideways Loungefåtölj", short: "Fåtölj" },
+  {
+    id: "sofa",
+    name: "RF1903-L Sideways Soffa",
+    short: "Soffa",
+    tileSize: 96, // px the 512px fabric tile is drawn at (weave scale)
+    views: [
+      { label: "Framifrån", photo: "public/sideways-sofa-1.avif", mask: "public/masks/sideways-sofa-1-mask.png", wood: "public/masks/sideways-sofa-1-wood.png" },
+      { label: "Snett framifrån", photo: "public/sideways-sofa-2.avif", mask: "public/masks/sideways-sofa-2-mask.png", wood: "public/masks/sideways-sofa-2-wood.png" },
+      { label: "Bakifrån", photo: "public/sideways-sofa-3.avif", mask: "public/masks/sideways-sofa-3-mask.png", wood: "public/masks/sideways-sofa-3-wood.png" },
+    ],
+  },
+  {
+    id: "chair",
+    name: "RF1904 Sideways Loungefåtölj",
+    short: "Fåtölj",
+    tileSize: 128,
+    views: [
+      { label: "Framifrån", photo: "public/sideways-chair-1.png", mask: "public/masks/sideways-chair-1-mask.png", wood: "public/masks/sideways-chair-1-wood.png" },
+      { label: "Snett framifrån", photo: "public/sideways-chair-2.png", mask: "public/masks/sideways-chair-2-mask.png", wood: "public/masks/sideways-chair-2-wood.png" },
+    ],
+  },
 ];
 
 // The living room hero scene: both products in one photo, recolored via

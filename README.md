@@ -6,10 +6,12 @@ Carl Hansen & Søn), visade fotorealistiskt i ett riktigt vardagsrum.
 
 ## Funktioner
 
-- **Vardagsrummet i centrum:** `public/living-room.png` visar båda
-  möblerna i ett riktigt rum. Soffan och fåtöljen färgas om direkt i
-  bilden – klicka på en möbel i fotot (eller använd flikarna) för att
-  välja vilken som konfigureras.
+- **Två visningslägen:** *Produktvyer* (standard) visar soffan och
+  fåtöljen som fristående produktfoton med flera vyer per möbel och
+  spegelvändning. *I vardagsrummet* visar båda möblerna i rumsfotot
+  `public/living-room.png` – klicka på en möbel i bilden för att välja
+  vilken som konfigureras. Samma val (tyg, kulör, trä) gäller i båda
+  lägena.
 - **Fotorealistisk omfärgning med vävstruktur:** tygprovets väv och kulör
   draperas över tygytorna, medan fotots ljus, skuggor och veck bevaras.
   Trästommen färgas om via egna masker med bevarad ådring.
