@@ -13,25 +13,18 @@
   </header>
 
   <main class="layout">
-    <section class="stage" aria-label="Produktvisning">
-      <div class="product-card" id="card-sofa" data-product="sofa" tabindex="0" role="button" aria-pressed="true">
-        <h2>RF1903-L Sideways Soffa</h2>
-        <canvas class="photo-view" aria-label="Soffan i vald tygfärg"></canvas>
-        <div class="view-row">
-          <div class="view-thumbs" role="tablist" aria-label="Vy"></div>
-          <button class="flip-btn" data-role="flip" type="button" aria-pressed="false" title="Spegelvänd bilden">⇋ Spegelvänd</button>
-        </div>
-        <p class="config-line" id="summary-sofa"></p>
-      </div>
-
-      <div class="product-card" id="card-chair" data-product="chair" tabindex="0" role="button" aria-pressed="false">
-        <h2>RF1904 Sideways Loungefåtölj</h2>
-        <canvas class="photo-view" aria-label="Fåtöljen i vald tygfärg"></canvas>
-        <div class="view-row">
-          <div class="view-thumbs" role="tablist" aria-label="Vy"></div>
-          <button class="flip-btn" data-role="flip" type="button" aria-pressed="false" title="Spegelvänd bilden">⇋ Spegelvänd</button>
-        </div>
-        <p class="config-line" id="summary-chair"></p>
+    <section class="hero" aria-label="Vardagsrum med soffan och fåtöljen">
+      <canvas id="scene" aria-label="Vardagsrummet med möblerna i valda tyger och träfinish"></canvas>
+      <p class="hero-hint">Klicka på soffan eller fåtöljen i bilden för att välja vilken möbel du konfigurerar.</p>
+      <div class="scene-summaries">
+        <button class="scene-summary" id="pick-sofa" data-product="sofa" type="button" aria-pressed="true">
+          <b>RF1903-L Soffa</b>
+          <span id="summary-sofa"></span>
+        </button>
+        <button class="scene-summary" id="pick-chair" data-product="chair" type="button" aria-pressed="false">
+          <b>RF1904 Loungefåtölj</b>
+          <span id="summary-chair"></span>
+        </button>
       </div>
     </section>
 
@@ -63,8 +56,8 @@
         <button class="apply-both" id="apply-both">Använd samma val på båda möblerna</button>
       </div>
 
-      <p class="fineprint">Stomme i ek och flätad rygg i naturfärgat pappersgarn, som på fotona.
-        Tygprovets väv och kulör läggs på fotot; fotonas ljus och skuggor bevaras.</p>
+      <p class="fineprint">Stomme och flätad rygg i naturfärgat pappersgarn som på fotot.
+        Tygprovets väv och kulör draperas över möblerna i rummet; fotots ljus och skuggor bevaras.</p>
     </aside>
   </main>
 

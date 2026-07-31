@@ -1,18 +1,20 @@
 # Sideways färgväljare
 
-En webbapp för att välja tygfärg för **RF1903-L Sideways Soffa** och
-**RF1904 Sideways Loungefåtölj** (design Rikke Frost för Carl Hansen & Søn),
-med fotorealistisk visning baserad på riktiga produktfoton.
+En webbapp för att välja tygfärg och träfinish för **RF1903-L Sideways
+Soffa** och **RF1904 Sideways Loungefåtölj** (design Rikke Frost för
+Carl Hansen & Søn), visade fotorealistiskt i ett riktigt vardagsrum.
 
 ## Funktioner
 
-- **Fotorealistisk omfärgning med vävstruktur:** produktfotona (`public/`)
-  färgas om direkt i webbläsaren. Tygprovets väv och kulör draperas över
-  tygytorna, medan fotots ljus, skuggor och veck bevaras – så resultatet
-  ser ut som ett riktigt produktfoto även för grova vävar som Capture och
-  Canvas Natur. Ek-stommen och pappersgarnet påverkas inte.
-- **Flera vyer:** soffan har tre vyer (framifrån, snett framifrån, bakifrån)
-  och fåtöljen två. Även tyget som syns mellan ryggens träribbor färgas om.
+- **Vardagsrummet i centrum:** `public/living-room.png` visar båda
+  möblerna i ett riktigt rum. Soffan och fåtöljen färgas om direkt i
+  bilden – klicka på en möbel i fotot (eller använd flikarna) för att
+  välja vilken som konfigureras.
+- **Fotorealistisk omfärgning med vävstruktur:** tygprovets väv och kulör
+  draperas över tygytorna, medan fotots ljus, skuggor och veck bevaras.
+  Trästommen färgas om via egna masker med bevarad ådring.
+  Maskerna genereras av `tools/lr-masks.js` från handritade polygoner i
+  `tools/lr-regions.js`.
 - **10 tyger, 326 kulörer:** Canvas 2, Canvas Natur, Capture, Clara 2,
   Divina Melange 3, Fiord 2, Hallingdal 65, Mood, Remix 3 och Re-wool,
   grupperade per tyg i väljaren och sorterade efter färgnummer.
@@ -24,8 +26,6 @@ med fotorealistisk visning baserad på riktiga produktfoton.
   (`public/oiled-oak.avif`, `soaped-oak.avif`, `walnut.avif`,
   se `tools/calibrate-wood.js`), och swatch-knapparna visar riktigt trä
   beskuret ur fotona. Träet färgas om via en egen mask med bevarad ådring.
-- **Spegelvänd:** varje möbel kan spegelvändas (t.ex. för att visa
-  soffan som höger- i stället för vänsterversion).
 - Soffan och fåtöljen konfigureras var för sig, med en knapp för att
   använda samma val på båda. Alla val sparas lokalt i webbläsaren.
 

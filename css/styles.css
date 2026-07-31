@@ -44,105 +44,57 @@ body {
   .layout { grid-template-columns: 1fr; }
 }
 
-/* ---------- Stage ---------- */
-.stage {
-  display: grid;
-  grid-template-columns: 3fr 2fr;
-  gap: 22px;
-  align-items: start;
-}
-@media (max-width: 720px) {
-  .stage { grid-template-columns: 1fr; }
-}
-
-.product-card {
+/* ---------- Hero scene ---------- */
+.hero {
   background: var(--panel);
-  border: 2px solid var(--border);
+  border: 1px solid var(--border);
   border-radius: 14px;
-  padding: 18px 18px 14px;
-  cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s;
+  padding: 18px;
 }
-.product-card:hover { box-shadow: 0 4px 18px rgba(0, 0, 0, 0.07); }
-.product-card.active {
-  border-color: var(--accent);
-  box-shadow: 0 4px 18px rgba(138, 106, 76, 0.18);
-}
-.product-card h2 {
-  font-size: 15px;
-  font-weight: 600;
-  letter-spacing: 0.5px;
-  margin-bottom: 10px;
-}
-.product-card.active h2::after {
-  content: " · konfigureras";
-  color: var(--accent);
-  font-weight: 400;
-  font-size: 12px;
-}
-
-.photo-view {
+#scene {
   width: 100%;
   height: auto;
   display: block;
-  border-radius: 8px;
+  border-radius: 10px;
+  cursor: pointer;
 }
-
-.photo-view.flipped { transform: scaleX(-1); }
-.view-thumbs img.flipped { transform: scaleX(-1); }
-
-.view-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-}
-
-.flip-btn {
-  padding: 6px 12px;
+.hero-hint {
   font-size: 12px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
+  color: var(--muted);
+  margin-top: 10px;
+}
+
+.scene-summaries {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 12px;
+}
+@media (max-width: 640px) {
+  .scene-summaries { grid-template-columns: 1fr; }
+}
+.scene-summary {
+  text-align: left;
+  padding: 10px 14px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
   background: var(--bg);
   cursor: pointer;
   color: var(--ink);
-  white-space: nowrap;
+  font-size: 13px;
 }
-.flip-btn:hover { border-color: var(--accent); }
-.flip-btn.active {
-  background: var(--accent);
+.scene-summary b { display: block; margin-bottom: 3px; }
+.scene-summary span { color: var(--muted); font-size: 12px; }
+.scene-summary:hover { border-color: var(--accent); }
+.scene-summary.active {
   border-color: var(--accent);
-  color: #fff;
+  box-shadow: 0 2px 10px rgba(138, 106, 76, 0.18);
 }
-
-.view-thumbs {
-  display: flex;
-  gap: 8px;
-  margin-top: 10px;
-}
-.view-thumbs button {
-  padding: 0;
-  border: 2px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg);
-  cursor: pointer;
-  width: 64px;
-  height: 44px;
-  overflow: hidden;
-}
-.view-thumbs button.active { border-color: var(--accent); }
-.view-thumbs img {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  display: block;
-}
-
-.config-line {
-  font-size: 12px;
-  color: var(--muted);
-  margin-top: 8px;
-  min-height: 1.2em;
+.scene-summary.active b::after {
+  content: " · konfigureras";
+  color: var(--accent);
+  font-weight: 400;
+  font-size: 11px;
 }
 
 /* ---------- Controls ---------- */
