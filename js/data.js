@@ -20,15 +20,22 @@ const PRODUCTS = [
 const SCENE = {
   photo: "public/living-room.png",
   regions: {
+    // tileTransform [a,b,c,d] maps pixel (x,y) to weave coordinates
+    // (u,v) = (a·x + b·y, c·x + d·y), approximating each piece's
+    // perspective: the sofa is nearly frontal with a slight downward view
+    // of the seat; the chair is seen at an angle, so its weave is
+    // compressed horizontally and sheared.
     sofa: {
       fabric: "public/masks/lr-sofa-fabric.png",
       wood: "public/masks/lr-sofa-wood.png",
       tileSize: 80,
+      tileTransform: [1, 0, 0, 0.85],
     },
     chair: {
       fabric: "public/masks/lr-chair-fabric.png",
       wood: "public/masks/lr-chair-wood.png",
       tileSize: 96,
+      tileTransform: [0.72, 0.1, 0, 0.88],
     },
   },
 };

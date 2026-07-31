@@ -127,6 +127,7 @@ function loadScene() {
           fabricData,
           woodData,
           tileSize: SCENE.regions[n].tileSize,
+          tileTransform: SCENE.regions[n].tileTransform || [1, 0, 0, 1],
           meanLum: Math.max(0.05, fW ? fSum / fW : 0.62),
           meanWoodLum: Math.max(0.05, wW ? wSum / wW : 0.6),
         };
@@ -175,9 +176,9 @@ function recolorScene(sc, jobs) {
     const wm = region.woodData.data;
     const td = tile.data;
     const ts = tile.width;
+    const [ta, tb, tc2, td2] = region.tileTransform;
     const wc = woodHex ? hexToRgb(woodHex) : null;
     for (let y = 0; y < sc.h; y++) {
-      const trow = (y % ts) * ts;
       for (let x = 0; x < sc.w; x++) {
         const p = y * sc.w + x;
         const i = p * 4;
@@ -188,7 +189,10 @@ function recolorScene(sc, jobs) {
         let fr = 0, fg = 0, fb = 0;
         if (af) {
           const f = Math.pow(sc.lumMap[p] / region.meanLum, 0.85);
-          const ti = (trow + (x % ts)) * 4;
+          // perspective-approximating weave coordinates
+          const u = ((Math.round(ta * x + tb * y) % ts) + ts) % ts;
+          const v = ((Math.round(tc2 * x + td2 * y) % ts) + ts) % ts;
+          const ti = (v * ts + u) * 4;
           fr = Math.min(255, td[ti] * f);
           fg = Math.min(255, td[ti + 1] * f);
           fb = Math.min(255, td[ti + 2] * f);
