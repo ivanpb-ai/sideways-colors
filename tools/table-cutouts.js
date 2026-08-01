@@ -69,25 +69,35 @@ const TABLES = [
           }
         }
       }
-      // restore enclosed transparent regions (flood leaks through rim
-      // gaps into the marble/laminate top): re-flood transparency from
-      // the borders; transparent pixels NOT reached are enclosed -> keep
+      // background is also visible THROUGH the table (between the top
+      // and the lower shelf, and through the rim slits) — those regions
+      // are enclosed by the silhouette so the border flood never reaches
+      // them. Clear large enclosed near-white components; small bright
+      // spots (specular highlights, brass) are kept.
       {
-        const reach = new Uint8Array(W * H);
-        const st = [];
-        const tryPush = (p) => { if (!reach[p] && d[p * 4 + 3] === 0) { reach[p] = 1; st.push(p); } };
-        for (let px = 0; px < W; px++) { tryPush(px); tryPush((H - 1) * W + px); }
-        for (let py = 0; py < H; py++) { tryPush(py * W); tryPush(py * W + W - 1); }
-        while (st.length) {
-          const p = st.pop();
-          const px = p % W, py = (p / W) | 0;
-          if (px > 0) tryPush(p - 1);
-          if (px < W - 1) tryPush(p + 1);
-          if (py > 0) tryPush(p - W);
-          if (py < H - 1) tryPush(p + W);
-        }
-        for (let p = 0; p < W * H; p++) {
-          if (d[p * 4 + 3] === 0 && !reach[p]) d[p * 4 + 3] = 255;
+        const isWhite = (i) => Math.min(d[i], d[i + 1], d[i + 2]) > 218;
+        const seen = new Uint8Array(W * H);
+        for (let start = 0; start < W * H; start++) {
+          if (seen[start] || d[start * 4 + 3] === 0 || !isWhite(start * 4)) continue;
+          const comp = [];
+          const st = [start];
+          seen[start] = 1;
+          let touchesBorder = false;
+          while (st.length) {
+            const p = st.pop();
+            comp.push(p);
+            const px = p % W, py = (p / W) | 0;
+            if (px === 0 || px === W - 1 || py === 0 || py === H - 1) touchesBorder = true;
+            for (const q of [p - 1, p + 1, p - W, p + W]) {
+              if (q < 0 || q >= W * H || seen[q]) continue;
+              const qx = q % W;
+              if (Math.abs(qx - px) > 1) continue;
+              if (d[q * 4 + 3] !== 0 && isWhite(q * 4)) { seen[q] = 1; st.push(q); }
+            }
+          }
+          if (!touchesBorder && comp.length >= 300) {
+            for (const p of comp) d[p * 4 + 3] = 0;
+          }
         }
       }
       // the marble top reads as background (white on white, connected
