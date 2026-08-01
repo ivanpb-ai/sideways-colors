@@ -1,8 +1,9 @@
 # Sideways färgväljare
 
-En webbapp för att välja tygfärg och träfinish för **RF1903-L Sideways
-Soffa** och **RF1904 Sideways Loungefåtölj** (design Rikke Frost för
-Carl Hansen & Søn), visade fotorealistiskt i ett riktigt vardagsrum.
+En webbapp för att konfigurera **RF1903-L Sideways Soffa**,
+**RF1904 Sideways Loungefåtölj** och **RF1905 Sideways Bord**
+(design Rikke Frost för Carl Hansen & Søn), visade fotorealistiskt –
+även tillsammans i ett riktigt vardagsrum.
 
 ## Funktioner
 
@@ -28,6 +29,11 @@ Carl Hansen & Søn), visade fotorealistiskt i ett riktigt vardagsrum.
   (`public/oiled-oak.avif`, `soaped-oak.avif`, `walnut.avif`,
   se `tools/calibrate-wood.js`), och swatch-knapparna visar riktigt trä
   beskuret ur fotona. Träet färgas om via en egen mask med bevarad ådring.
+- **Sideways-bordet i tre utföranden:** ek olja, ek olja + svart
+  laminat samt vit marmor + valnöt olja. Bordet visas med frilagda
+  produktbilder (`tools/table-cutouts.js` skär ut bordet ur
+  produktfotona i `public/` och tar bort den vita bakgrunden) och
+  komponeras in i vardagsrummet framför soffan med mjuk skugga.
 - Soffan och fåtöljen konfigureras var för sig, med en knapp för att
   använda samma val på båda. Alla val sparas lokalt i webbläsaren.
 

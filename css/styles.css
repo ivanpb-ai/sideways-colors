@@ -152,6 +152,41 @@ body {
   min-height: 1.2em;
 }
 
+.table-card { grid-column: 1 / -1; }
+.table-card img {
+  display: block;
+  max-width: 420px;
+  width: 60%;
+  margin: 10px auto;
+}
+
+.finish-list {
+  display: grid;
+  gap: 10px;
+}
+.finish-option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 10px;
+  border: 2px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg);
+  cursor: pointer;
+  color: var(--ink);
+  font-size: 13px;
+  text-align: left;
+}
+.finish-option:hover { border-color: var(--accent); }
+.finish-option.active {
+  border-color: var(--ink);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+}
+.finish-option img {
+  width: 96px;
+  flex: 0 0 auto;
+}
+
 /* ---------- Hero scene ---------- */
 .hero {
   background: var(--panel);

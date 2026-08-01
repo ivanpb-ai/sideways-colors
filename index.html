@@ -9,7 +9,7 @@
 <body>
   <header class="site-header">
     <h1>Sideways <span>färgväljare</span></h1>
-    <p class="tagline">RF1903 Sideways Soffa &amp; RF1904 Sideways Loungefåtölj · Design Rikke Frost för Carl&nbsp;Hansen&nbsp;&amp;&nbsp;Søn</p>
+    <p class="tagline">RF1903 Soffa · RF1904 Loungefåtölj · RF1905 Bord · Design Rikke Frost för Carl&nbsp;Hansen&nbsp;&amp;&nbsp;Søn</p>
   </header>
 
   <main class="layout">
@@ -39,6 +39,12 @@
           </div>
           <p class="config-line" id="summary-chair"></p>
         </div>
+
+        <div class="product-card table-card" id="card-table" data-product="table" tabindex="0" role="button" aria-pressed="false">
+          <h2>RF1905 Sideways Bord</h2>
+          <img id="table-photo" alt="Bordet i valt utförande" />
+          <p class="config-line" id="summary-table"></p>
+        </div>
       </section>
 
       <!-- ==================== Living room scene ==================== -->
@@ -54,6 +60,10 @@
             <b>RF1904 Loungefåtölj</b>
             <span id="scene-summary-chair"></span>
           </button>
+          <button class="scene-summary" id="pick-table" data-product="table" type="button" aria-pressed="false">
+            <b>RF1905 Bord</b>
+            <span id="scene-summary-table"></span>
+          </button>
         </div>
       </section>
     </div>
@@ -64,26 +74,31 @@
         <div class="segmented" id="product-tabs"></div>
       </div>
 
-      <div class="control-block">
+      <div class="control-block" id="finish-block" hidden>
+        <h3>Utförande</h3>
+        <div class="finish-list" id="finish-swatches"></div>
+      </div>
+
+      <div class="control-block" id="fabric-block">
         <h3>Tyg</h3>
         <div class="chip-row" id="fabric-chips"></div>
         <p class="fabric-info" id="fabric-info"></p>
       </div>
 
-      <div class="control-block">
+      <div class="control-block" id="color-block">
         <h3>Färg</h3>
         <div class="swatch-grid" id="color-swatches"></div>
         <p class="selected-color" id="selected-color-label"></p>
       </div>
 
-      <div class="control-block">
+      <div class="control-block" id="wood-block">
         <h3>Trä</h3>
         <div class="swatch-grid wood-grid" id="wood-swatches"></div>
         <p class="selected-color" id="selected-wood-label"></p>
       </div>
 
-      <div class="control-block">
-        <button class="apply-both" id="apply-both">Använd samma val på båda möblerna</button>
+      <div class="control-block" id="apply-block">
+        <button class="apply-both" id="apply-both">Använd samma val på soffa och fåtölj</button>
       </div>
 
       <p class="fineprint">Stomme och flätad rygg i naturfärgat pappersgarn, som på fotona.

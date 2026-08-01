@@ -9,8 +9,9 @@ function defaultConfig(productId) {
 
 const state = {
   mode: "products", // "products" | "scene"
-  activeProduct: "sofa",
+  activeProduct: "sofa", // "sofa" | "chair" | "table"
   configs: { sofa: defaultConfig("sofa"), chair: defaultConfig("chair") },
+  table: { finishId: "oak" },
   views: { sofa: 0, chair: 0 },
   flips: { sofa: false, chair: false },
 };
@@ -32,6 +33,9 @@ function findWood(cfg) {
 function findProduct(productId) {
   return PRODUCTS.find((p) => p.id === productId);
 }
+function findFinish() {
+  return TABLE.finishes.find((f) => f.id === state.table.finishId) || TABLE.finishes[0];
+}
 
 function loadState() {
   try {
@@ -49,8 +53,14 @@ function loadState() {
         state.flips[p.id] = saved.flips[p.id];
       }
     });
-    if (PRODUCTS.some((p) => p.id === saved.activeProduct)) {
+    if (
+      PRODUCTS.some((p) => p.id === saved.activeProduct) ||
+      saved.activeProduct === "table"
+    ) {
       state.activeProduct = saved.activeProduct;
+    }
+    if (saved.table && TABLE.finishes.some((f) => f.id === saved.table.finishId)) {
+      state.table.finishId = saved.table.finishId;
     }
     if (saved.mode === "products" || saved.mode === "scene") {
       state.mode = saved.mode;
@@ -334,26 +344,56 @@ function loadScene() {
 }
 
 let sceneToken = null;
+const tableImgCache = {};
+
+function loadTableImg(src) {
+  if (!tableImgCache[src]) tableImgCache[src] = loadImage(src);
+  return tableImgCache[src];
+}
 
 async function renderScene() {
-  const token = JSON.stringify(state.configs);
+  const token = JSON.stringify([state.configs, state.table]);
   sceneToken = token;
   const sc = await loadScene();
-  const jobs = await Promise.all(
-    PRODUCTS.map(async (p) => {
-      const cfg = state.configs[p.id];
-      const region = sc.regions[p.id];
-      const tile = await loadTile(findColor(cfg).tile, region.tileSize);
-      return { region, tile, woodHex: findWood(cfg).hex };
-    })
-  );
+  const [jobs, tableImg] = await Promise.all([
+    Promise.all(
+      PRODUCTS.map(async (p) => {
+        const cfg = state.configs[p.id];
+        const region = sc.regions[p.id];
+        const tile = await loadTile(findColor(cfg).tile, region.tileSize);
+        return { region, tile, woodHex: findWood(cfg).hex };
+      })
+    ),
+    loadTableImg(findFinish().img),
+  ]);
   if (sceneToken !== token) return; // superseded meanwhile
   const canvas = document.getElementById("scene");
   canvas.width = sc.w;
   canvas.height = sc.h;
   const out = new ImageData(new Uint8ClampedArray(sc.orig.data), sc.w, sc.h);
   jobs.forEach((j) => recolorRegion(out, sc, j.region, j.tile, j.woodHex));
-  canvas.getContext("2d").putImageData(out, 0, 0);
+  const ctx = canvas.getContext("2d");
+  ctx.putImageData(out, 0, 0);
+
+  // composite the table into the scene: soft floor shadow, then cutout
+  const t = TABLE.scene;
+  const scale = sc.w / 1152; // scene coords are authored at native width
+  const tx = t.x * scale, ty = t.y * scale, tw = t.w * scale, th = t.h * scale;
+  const g = ctx.createRadialGradient(
+    tx + tw / 2, ty + th - 6 * scale, 1,
+    tx + tw / 2, ty + th - 6 * scale, tw * 0.5
+  );
+  g.addColorStop(0, "rgba(30,20,15,0.32)");
+  g.addColorStop(0.7, "rgba(30,20,15,0.16)");
+  g.addColorStop(1, "rgba(30,20,15,0)");
+  ctx.save();
+  ctx.translate(tx + tw / 2, ty + th - 6 * scale);
+  ctx.scale(1, 0.16);
+  ctx.translate(-(tx + tw / 2), -(ty + th - 6 * scale));
+  ctx.fillStyle = g;
+  ctx.fillRect(tx - tw * 0.2, ty + th - 6 * scale - tw * 0.5, tw * 1.4, tw);
+  ctx.restore();
+  ctx.drawImage(tableImg, tx, ty, tw, th);
 }
 
 // ---------- controls ----------
@@ -377,10 +417,12 @@ function renderModeTabs() {
   document.getElementById("stage-scene").hidden = state.mode !== "scene";
 }
 
+const SELECTABLE = () => [...PRODUCTS.map((p) => ({ id: p.id, short: p.short })), { id: "table", short: TABLE.short }];
+
 function renderProductTabs() {
   const el = document.getElementById("product-tabs");
   el.innerHTML = "";
-  PRODUCTS.forEach((p) => {
+  SELECTABLE().forEach((p) => {
     const btn = document.createElement("button");
     btn.textContent = p.short;
     btn.classList.toggle("active", state.activeProduct === p.id);
@@ -391,7 +433,7 @@ function renderProductTabs() {
     el.appendChild(btn);
   });
 
-  PRODUCTS.forEach((p) => {
+  SELECTABLE().forEach((p) => {
     const active = state.activeProduct === p.id;
     const card = document.getElementById(`card-${p.id}`);
     card.classList.toggle("active", active);
@@ -400,9 +442,40 @@ function renderProductTabs() {
     pick.classList.toggle("active", active);
     pick.setAttribute("aria-pressed", String(active));
   });
+
+  // the table is configured by finish; sofa/chair by fabric+color+wood
+  const isTable = state.activeProduct === "table";
+  document.getElementById("finish-block").hidden = !isTable;
+  document.getElementById("fabric-block").hidden = isTable;
+  document.getElementById("color-block").hidden = isTable;
+  document.getElementById("wood-block").hidden = isTable;
+  document.getElementById("apply-block").hidden = isTable;
+}
+
+function renderFinishSwatches() {
+  const el = document.getElementById("finish-swatches");
+  el.innerHTML = "";
+  TABLE.finishes.forEach((f) => {
+    const btn = document.createElement("button");
+    btn.className = "finish-option";
+    btn.classList.toggle("active", state.table.finishId === f.id);
+    const img = document.createElement("img");
+    img.src = f.img;
+    img.alt = "";
+    btn.appendChild(img);
+    const label = document.createElement("span");
+    label.textContent = f.name;
+    btn.appendChild(label);
+    btn.addEventListener("click", () => {
+      state.table.finishId = f.id;
+      update();
+    });
+    el.appendChild(btn);
+  });
 }
 
 function renderFabricChips() {
+  if (state.activeProduct === "table") return;
   const cfg = state.configs[state.activeProduct];
   const el = document.getElementById("fabric-chips");
   el.innerHTML = "";
@@ -421,6 +494,7 @@ function renderFabricChips() {
 }
 
 function renderColorSwatches() {
+  if (state.activeProduct === "table") return;
   const cfg = state.configs[state.activeProduct];
   const fabric = findFabric(cfg.fabricId);
   const el = document.getElementById("color-swatches");
@@ -452,6 +526,7 @@ function renderColorSwatches() {
 }
 
 function renderWoodSwatches() {
+  if (state.activeProduct === "table") return;
   const cfg = state.configs[state.activeProduct];
   const el = document.getElementById("wood-swatches");
   el.innerHTML = "";
@@ -522,9 +597,18 @@ function renderSummary(productId) {
   document.getElementById(`scene-summary-${productId}`).textContent = text;
 }
 
+function renderTable() {
+  const finish = findFinish();
+  document.getElementById("table-photo").src = finish.img;
+  const text = finish.name;
+  document.getElementById("summary-table").textContent = text;
+  document.getElementById("scene-summary-table").textContent = text;
+}
+
 function renderControls() {
   renderModeTabs();
   renderProductTabs();
+  renderFinishSwatches();
   renderFabricChips();
   renderColorSwatches();
   renderWoodSwatches();
@@ -534,6 +618,7 @@ function renderControls() {
 function update() {
   renderControls();
   PRODUCTS.forEach((p) => renderSummary(p.id));
+  renderTable();
   if (state.mode === "products") {
     PRODUCTS.forEach((p) => {
       renderFlip(p.id);
@@ -581,6 +666,15 @@ document.getElementById("scene").addEventListener("click", async (e) => {
   const rect = canvas.getBoundingClientRect();
   const x = Math.floor(((e.clientX - rect.left) / rect.width) * sc.w);
   const y = Math.floor(((e.clientY - rect.top) / rect.height) * sc.h);
+  // the table sits in front of everything — check it first
+  const t = TABLE.scene;
+  const scale = sc.w / 1152;
+  if (x >= t.x * scale && x <= (t.x + t.w) * scale &&
+      y >= t.y * scale && y <= (t.y + t.h) * scale) {
+    state.activeProduct = "table";
+    renderControls();
+    return;
+  }
   const i = (y * sc.w + x) * 4 + 3;
   for (const p of PRODUCTS) {
     const r = sc.regions[p.id];
@@ -590,6 +684,15 @@ document.getElementById("scene").addEventListener("click", async (e) => {
       return;
     }
   }
+});
+
+document.getElementById("card-table").addEventListener("click", () => {
+  state.activeProduct = "table";
+  renderControls();
+});
+document.getElementById("pick-table").addEventListener("click", () => {
+  state.activeProduct = "table";
+  renderControls();
 });
 
 document.getElementById("apply-both").addEventListener("click", () => {
