@@ -6,7 +6,7 @@ const REGIONS = require('./lr-regions.js');
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
   const page = await browser.newPage();
   const out = await page.evaluate(async (REGIONS) => {
-    const W = 2272, H = 1816;
+    const W = 1152, H = 928;
     const make = (polys) => {
       const c = document.createElement('canvas');
       c.width = W; c.height = H;

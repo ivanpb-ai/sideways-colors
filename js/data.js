@@ -47,13 +47,13 @@ const SCENE = {
     sofa: {
       fabric: "public/masks/lr-sofa-fabric.png",
       wood: "public/masks/lr-sofa-wood.png",
-      tileSize: 80,
+      tileSize: 44,
       tileTransform: [1, 0, 0, 0.85],
     },
     chair: {
       fabric: "public/masks/lr-chair-fabric.png",
       wood: "public/masks/lr-chair-wood.png",
-      tileSize: 96,
+      tileSize: 52,
       tileTransform: [0.72, 0.1, 0, 0.88],
     },
   },
