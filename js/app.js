@@ -211,10 +211,11 @@ function grabImages(photo, masks, w, h) {
 
 // ---------- product photo renderer ----------
 const PRODUCT_MAX_W = 1400;
-const viewCache = {}; // "product/viewIdx" -> Promise<{w,h,orig,lumMap,region}>
+const THUMB_W = 160;
+const viewCache = {}; // "product/viewIdx@width" -> Promise<{w,h,orig,lumMap,region}>
 
-function loadView(productId, viewIdx) {
-  const key = `${productId}/${viewIdx}`;
+function loadViewAt(productId, viewIdx, maxW) {
+  const key = `${productId}/${viewIdx}@${maxW}`;
   if (!viewCache[key]) {
     const view = findProduct(productId).views[viewIdx];
     viewCache[key] = Promise.all([
@@ -222,7 +223,7 @@ function loadView(productId, viewIdx) {
       loadImage(view.mask),
       loadImage(view.wood),
     ]).then(([photo, mask, woodMask]) => {
-      const scale = Math.min(1, PRODUCT_MAX_W / photo.naturalWidth);
+      const scale = Math.min(1, maxW / photo.naturalWidth);
       const w = Math.round(photo.naturalWidth * scale);
       const h = Math.round(photo.naturalHeight * scale);
       const { orig, lumMap, maskDatas } = grabImages(photo, [mask, woodMask], w, h);
@@ -237,6 +238,10 @@ function loadView(productId, viewIdx) {
     });
   }
   return viewCache[key];
+}
+
+function loadView(productId, viewIdx) {
+  return loadViewAt(productId, viewIdx, PRODUCT_MAX_W);
 }
 
 const renderToken = {};
@@ -260,6 +265,34 @@ async function renderPhoto(productId) {
   const out = new ImageData(new Uint8ClampedArray(vc.orig.data), vc.w, vc.h);
   recolorRegion(out, vc, vc.region, tile, wood.hex);
   canvas.getContext("2d").putImageData(out, 0, 0);
+}
+
+// Low-res recolored view thumbnails, so they track the configuration.
+const thumbToken = {};
+
+async function renderThumbs(productId) {
+  const cfg = state.configs[productId];
+  const color = findColor(cfg);
+  const wood = findWood(cfg);
+  const token = `${color.id}/${cfg.fabricId}/${cfg.woodId}`;
+  thumbToken[productId] = token;
+  const product = findProduct(productId);
+  for (let idx = 0; idx < product.views.length; idx++) {
+    const [vc, tile] = await Promise.all([
+      loadViewAt(productId, idx, THUMB_W),
+      loadTile(color.tile, 16), // tiny tile ≈ swatch average at thumb scale
+    ]);
+    if (thumbToken[productId] !== token) return; // superseded meanwhile
+    const canvas = document.querySelector(
+      `#card-${productId} .view-thumbs button:nth-child(${idx + 1}) canvas`
+    );
+    if (!canvas) return;
+    canvas.width = vc.w;
+    canvas.height = vc.h;
+    const out = new ImageData(new Uint8ClampedArray(vc.orig.data), vc.w, vc.h);
+    recolorRegion(out, vc, vc.region, tile, wood.hex);
+    canvas.getContext("2d").putImageData(out, 0, 0);
+  }
 }
 
 // ---------- living room scene renderer ----------
@@ -452,16 +485,16 @@ function renderViewThumbs(productId) {
     btn.title = v.label;
     btn.setAttribute("role", "tab");
     btn.classList.toggle("active", state.views[productId] === idx);
-    const img = document.createElement("img");
-    img.src = v.photo;
-    img.alt = v.label;
-    btn.appendChild(img);
+    const cv = document.createElement("canvas");
+    cv.setAttribute("aria-label", v.label);
+    btn.appendChild(cv);
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
       state.views[productId] = idx;
       renderViewThumbs(productId);
       renderFlip(productId);
       renderPhoto(productId);
+      renderThumbs(productId);
       saveState();
     });
     el.appendChild(btn);
@@ -472,8 +505,8 @@ function renderFlip(productId) {
   const flipped = state.flips[productId];
   const card = document.getElementById(`card-${productId}`);
   card.querySelector(".photo-view").classList.toggle("flipped", flipped);
-  card.querySelectorAll(".view-thumbs img").forEach((img) =>
-    img.classList.toggle("flipped", flipped));
+  card.querySelectorAll(".view-thumbs canvas").forEach((cv) =>
+    cv.classList.toggle("flipped", flipped));
   const btn = card.querySelector("[data-role=flip]");
   btn.classList.toggle("active", flipped);
   btn.setAttribute("aria-pressed", String(flipped));
@@ -505,6 +538,7 @@ function update() {
     PRODUCTS.forEach((p) => {
       renderFlip(p.id);
       renderPhoto(p.id);
+      renderThumbs(p.id);
     });
   } else {
     renderScene();
