@@ -22,7 +22,7 @@ const REGIONS = require('./lr-regions.js');
       const s = document.createElement('canvas');
       s.width = W; s.height = H;
       const sx = s.getContext('2d');
-      sx.filter = 'blur(1.5px)';
+      sx.filter = 'blur(0.7px)';
       sx.drawImage(c, 0, 0);
       return s.toDataURL('image/png');
     };

@@ -207,14 +207,18 @@ function grabImages(photo, masks, w, h) {
     return ctx.getImageData(0, 0, w, h);
   };
   const orig = grab(photo, false);
-  // Macro-shading map: lightly blurred so the photo's own weave doesn't
-  // double with the fabric tile's.
+  // Shading map: mostly blurred (folds and shadows, so the photo's weave
+  // doesn't double with the fabric tile's) mixed with some raw luminance
+  // to keep the render as crisp as the rest of the photo.
   const blurred = grab(photo, true);
   const lumMap = new Float32Array(w * h);
   for (let p = 0; p < lumMap.length; p++) {
     const i = p * 4;
-    lumMap[p] =
+    const bl =
       (0.2126 * blurred.data[i] + 0.7152 * blurred.data[i + 1] + 0.0722 * blurred.data[i + 2]) / 255;
+    const raw =
+      (0.2126 * orig.data[i] + 0.7152 * orig.data[i + 1] + 0.0722 * orig.data[i + 2]) / 255;
+    lumMap[p] = 0.55 * bl + 0.45 * raw;
   }
   return { orig, lumMap, maskDatas: masks.map((m) => grab(m, false)) };
 }
