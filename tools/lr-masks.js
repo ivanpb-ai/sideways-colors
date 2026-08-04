@@ -37,7 +37,7 @@ const REGIONS = require('./lr-regions.js');
     // limit snapping to zones where fabric borders the frame — against
     // the wallpaper the traced polygon is more reliable than color
     const SNAP_ZONE = {
-      sofa: (px, py) => py > 560 || px < 210 || px > 780,
+      sofa: (px, py) => py > 560 || px < 210 || (px > 780 && py > 500),
       chair: (px, py) => (px > 990 && py > 636) || py > 800, // frame/slats and rail only
     };
     // per-product fabric classifier for boundary snapping
