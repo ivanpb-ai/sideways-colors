@@ -84,7 +84,8 @@ function loadImage(src) {
     const img = new Image();
     img.onload = () => resolve(img);
     img.onerror = () => reject(new Error(`Kunde inte läsa ${src}`));
-    img.src = src;
+    // cache-bust local assets so regenerated masks are always refetched
+    img.src = src.startsWith("public/") ? `${src}?v=${ASSET_VERSION}` : src;
   });
 }
 

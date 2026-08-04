@@ -50,6 +50,8 @@ const REGIONS = require('./lr-regions.js');
       chair: (h, s, v) => {
         if (h >= 20 && h <= 50 && s >= 0.2) return false; // wood
         if (s <= 0.17 && v >= 0.25) return true; // grey fabric
+        // mauve shadow tones on the arm roll beside the slat panel
+        if ((h >= 290 || h <= 15) && s <= 0.34 && v >= 0.2) return true;
         // cool blue-grey shadow tones on the fabric (seat lip)
         return h >= 190 && h <= 260 && s <= 0.32 && v >= 0.2;
       },
