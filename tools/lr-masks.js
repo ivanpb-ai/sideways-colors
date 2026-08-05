@@ -1,7 +1,11 @@
-// Generate soft fabric/wood masks for both products in the living room scene.
-// Fabric masks are refined by color-snapping: within a narrow band around
-// the traced polygon boundary, pixels are classified as fabric or not by
-// color, so the mask follows the true fabric edge against frame/background.
+// Generate soft fabric/wood masks for both products in the living room
+// scene from the painted mask sources in tools/mask-sources/:
+//   fabric-white.png – the scene with all upholstery painted flat white
+//   wood-white.png   – the scene with all visible wood painted flat white
+// White pixels are extracted, cleaned up (despeckle, enclosed-hole fill)
+// and split per product. The hand-traced polygons in lr-regions.js are
+// no longer the masks themselves – they only vote on which product each
+// white component belongs to.
 const { chromium } = require('playwright');
 const fs = require('fs');
 const REGIONS = require('./lr-regions.js');
@@ -9,162 +13,256 @@ const REGIONS = require('./lr-regions.js');
 (async () => {
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
   const page = await browser.newPage();
-  const photoB64 = fs.readFileSync('/home/user/sideways-colors/public/living-room.png').toString('base64');
-  const out = await page.evaluate(async ({ REGIONS, photoB64 }) => {
+  const b64 = f => fs.readFileSync(f).toString('base64');
+  const out = await page.evaluate(async ({ REGIONS, fabB64, woodB64 }) => {
     const W = 1152, H = 928;
-    const photo = new Image();
-    photo.src = 'data:image/png;base64,' + photoB64;
-    await photo.decode();
-    const pc = document.createElement('canvas');
-    pc.width = W; pc.height = H;
-    const pctx = pc.getContext('2d');
-    pctx.drawImage(photo, 0, 0);
-    const pd = pctx.getImageData(0, 0, W, H).data;
+    const load = d => new Promise(r => {
+      const i = new Image();
+      i.onload = () => r(i);
+      i.src = 'data:image/png;base64,' + d;
+    });
+    const [fabImg, woodImg] = await Promise.all([load(fabB64), load(woodB64)]);
+    const pix = im => {
+      const c = document.createElement('canvas');
+      c.width = W; c.height = H;
+      const x = c.getContext('2d', { willReadFrequently: true });
+      x.drawImage(im, 0, 0, W, H);
+      return x.getImageData(0, 0, W, H).data;
+    };
 
-    const rgb2hsv = (r, g, b) => {
-      r /= 255; g /= 255; b /= 255;
-      const mx = Math.max(r, g, b), mn = Math.min(r, g, b), df = mx - mn;
-      let h = 0;
-      if (df > 0) {
-        if (mx === r) h = ((g - b) / df) % 6;
-        else if (mx === g) h = (b - r) / df + 2;
-        else h = (r - g) / df + 4;
-        h *= 60; if (h < 0) h += 360;
+    // rasterize each product's polygons, dilated a little, as the
+    // component-to-product voting oracle
+    const rasterize = polys => {
+      const c = document.createElement('canvas');
+      c.width = W; c.height = H;
+      const x = c.getContext('2d');
+      x.fillStyle = '#fff';
+      x.strokeStyle = '#fff';
+      x.lineWidth = 16;
+      x.lineJoin = 'round';
+      for (const poly of polys) {
+        x.beginPath();
+        poly.forEach(([px, py], i) => (i ? x.lineTo(px, py) : x.moveTo(px, py)));
+        x.closePath();
+        x.fill();
+        x.stroke();
       }
-      return [h, mx === 0 ? 0 : df / mx, mx];
+      const d = x.getImageData(0, 0, W, H).data;
+      const m = new Uint8Array(W * H);
+      for (let p = 0; p < W * H; p++) m[p] = d[p * 4 + 3] > 128 ? 1 : 0;
+      return m;
     };
-
-    // limit snapping to zones where fabric borders the frame — against
-    // the wallpaper the traced polygon is more reliable than color
-    const SNAP_ZONE = {
-      sofa: (px, py) => py > 560 || px < 210 || (px > 780 && py > 500),
-      chair: (px, py) => (px > 990 && py > 636) || py > 800, // frame/slats and rail only
-    };
-    // per-product fabric classifier for boundary snapping
-    const CLASSIFY = {
-      sofa: (h, s, v) => {
-        if (h >= 26 && h <= 48 && s >= 0.28 && v >= 0.25) return false; // oak
-        if (s < 0.09) return false; // wallpaper/neutral
-        return (h >= 305 || h <= 24) && s >= 0.09; // rose fabric
-      },
-      chair: (h, s, v) => {
-        if (h >= 20 && h <= 50 && s >= 0.2) return false; // wood
-        if (s <= 0.17 && v >= 0.25) return true; // grey fabric
-        // mauve/lilac shadow tones on the arm roll beside the slat panel
-        if ((h >= 260 || h <= 15) && s <= 0.34 && v >= 0.2) return true;
-        // cool blue-grey shadow tones on the fabric (seat lip)
-        return h >= 190 && h <= 260 && s <= 0.32 && v >= 0.2;
-      },
-    };
-
-    const trace = (x, polys) => {
+    const oracle = {};
+    for (const prod of ['sofa', 'chair']) {
+      oracle[prod] = {
+        fabric: rasterize(REGIONS[prod].fabric),
+        wood: rasterize(REGIONS[prod].wood),
+        any: rasterize([...REGIONS[prod].fabric, ...REGIONS[prod].wood]),
+      };
+    }
+    // exact (undilated) wood polygons – unioned into the painted wood
+    // below, so thin members (rails, posts) stay continuous even where
+    // the paint is patchy
+    const rasterizeExact = polys => {
+      const c = document.createElement('canvas');
+      c.width = W; c.height = H;
+      const x = c.getContext('2d');
+      x.fillStyle = '#fff';
       for (const poly of polys) {
         x.beginPath();
         poly.forEach(([px, py], i) => (i ? x.lineTo(px, py) : x.moveTo(px, py)));
         x.closePath();
         x.fill();
       }
+      const d = x.getImageData(0, 0, W, H).data;
+      const m = new Uint8Array(W * H);
+      for (let p = 0; p < W * H; p++) m[p] = d[p * 4 + 3] > 128 ? 1 : 0;
+      return m;
     };
-    const strokePolys = (x, polys, lw, op) => {
-      x.save();
-      x.globalCompositeOperation = op;
-      x.lineWidth = lw;
-      x.lineJoin = 'round';
-      x.strokeStyle = '#fff';
-      for (const poly of polys) {
-        x.beginPath();
-        poly.forEach(([px, py], i) => (i ? x.lineTo(px, py) : x.moveTo(px, py)));
-        x.closePath();
-        x.stroke();
+    const polyWood = {
+      sofa: rasterizeExact(REGIONS.sofa.wood),
+      chair: rasterizeExact(REGIONS.chair.wood),
+    };
+
+    const MIN_COMPONENT = 40; // px – drop speckle below this
+
+    const extract = (data, kind) => {
+      // 1) threshold: painted-white pixels
+      const white = new Uint8Array(W * H);
+      for (let p = 0; p < W * H; p++) {
+        const i = p * 4;
+        if (Math.min(data[i], data[i + 1], data[i + 2]) > 230) white[p] = 1;
       }
-      x.restore();
-    };
-
-    const make = (polys, snapKind) => {
-      const c = document.createElement('canvas');
-      c.width = W; c.height = H;
-      const x = c.getContext('2d');
-      x.fillStyle = '#fff';
-      trace(x, polys);
-
-      if (snapKind) {
-        // inner core: polygon eroded by ~6px (always fabric)
-        const innerC = document.createElement('canvas');
-        innerC.width = W; innerC.height = H;
-        const ix = innerC.getContext('2d');
-        ix.fillStyle = '#fff';
-        trace(ix, polys);
-        strokePolys(ix, polys, 12, 'destination-out');
-        // outer limit: polygon dilated by ~6px
-        const outerC = document.createElement('canvas');
-        outerC.width = W; outerC.height = H;
-        const ox = outerC.getContext('2d');
-        ox.fillStyle = '#fff';
-        trace(ox, polys);
-        strokePolys(ox, polys, 12, 'source-over');
-
-        const inner = ix.getImageData(0, 0, W, H).data;
-        const outer = ox.getImageData(0, 0, W, H).data;
-        const im = x.getImageData(0, 0, W, H);
-        const d = im.data;
-        const cls = CLASSIFY[snapKind];
-        const zone = SNAP_ZONE[snapKind];
-        for (let p = 0; p < W * H; p++) {
-          const i = p * 4;
-          if (inner[i + 3] > 128) {
-            d[i] = d[i + 1] = d[i + 2] = d[i + 3] = 255;
-          } else if (outer[i + 3] > 128) {
-            const px = p % W, py = (p / W) | 0;
-            let on;
-            if (zone(px, py)) {
-              const [h, s, v] = rgb2hsv(pd[i], pd[i + 1], pd[i + 2]);
-              on = cls(h, s, v);
-            } else {
-              on = d[i + 3] > 128; // keep the traced polygon edge
-            }
-            d[i] = d[i + 1] = d[i + 2] = on ? 255 : 0;
-            d[i + 3] = on ? 255 : 0;
-          } else {
-            d[i + 3] = 0;
+      // 2) connected components; vote each onto a product (or drop it)
+      const masks = { sofa: new Uint8Array(W * H), chair: new Uint8Array(W * H) };
+      const lab = new Int32Array(W * H);
+      const stack = new Int32Array(W * H);
+      let dropped = 0;
+      for (let s = 0; s < W * H; s++) {
+        if (!white[s] || lab[s]) continue;
+        let sp = 0, cnt = 0;
+        stack[sp++] = s; lab[s] = 1;
+        const members = [];
+        while (sp) {
+          const q = stack[--sp];
+          members.push(q); cnt++;
+          const qx = q % W;
+          for (const dq of [-1, 1, -W, W]) {
+            const r = q + dq;
+            if (r < 0 || r >= W * H || !white[r] || lab[r]) continue;
+            if (Math.abs((r % W) - qx) > 1) continue; // no row wrap
+            lab[r] = 1; stack[sp++] = r;
           }
         }
+        if (cnt < MIN_COMPONENT) { dropped++; continue; }
+        // majority vote against the polygon oracles. Wood fragments with
+        // no same-kind overlap fall back to the product's whole region;
+        // fabric has no fallback (the fabric behind the slat gaps is
+        // rendered as part of the wood panel, like before).
+        let votes = { sofa: 0, chair: 0 };
+        for (const q of members) {
+          if (oracle.sofa[kind][q]) votes.sofa++;
+          if (oracle.chair[kind][q]) votes.chair++;
+        }
+        if (!votes.sofa && !votes.chair && kind === 'wood') {
+          for (const q of members) {
+            if (oracle.sofa.any[q]) votes.sofa++;
+            if (oracle.chair.any[q]) votes.chair++;
+          }
+        }
+        if (!votes.sofa && !votes.chair) { dropped++; continue; } // scene white, not furniture
+        const target = votes.sofa >= votes.chair ? masks.sofa : masks.chair;
+        for (const q of members) target[q] = 1;
+      }
+      return { masks, dropped };
+    };
+
+    // 3) fill enclosed holes: shading creases inside the painted white,
+    // and for the wood panel also the slat gaps (rendered as wood, whose
+    // luminance-preserving recolor keeps them reading as shadowed depth)
+    const fillHoles = m => {
+      const seen = new Uint8Array(W * H);
+      const stack = new Int32Array(W * H);
+      let sp = 0;
+      const push = p => { if (!m[p] && !seen[p]) { seen[p] = 1; stack[sp++] = p; } };
+      for (let x = 0; x < W; x++) { push(x); push((H - 1) * W + x); }
+      for (let y = 0; y < H; y++) { push(y * W); push(y * W + W - 1); }
+      while (sp) {
+        const q = stack[--sp];
+        const qx = q % W;
+        for (const dq of [-1, 1, -W, W]) {
+          const r = q + dq;
+          if (r < 0 || r >= W * H || m[r] || seen[r]) continue;
+          if (Math.abs((r % W) - qx) > 1) continue;
+          seen[r] = 1; stack[sp++] = r;
+        }
+      }
+      let filled = 0;
+      for (let p = 0; p < W * H; p++) if (!m[p] && !seen[p]) { m[p] = 1; filled++; }
+      return filled;
+    };
+
+    // 3b) morphological close (bridge gaps in the painted wood, e.g.
+    // where brush strokes missed parts of a rail) – but never into the
+    // same product's fabric, so the slat-gap/fabric boundary stays put
+    const closeInto = (m, keepOut) => {
+      const draw = src => {
+        const c = document.createElement('canvas');
+        c.width = W; c.height = H;
+        const x = c.getContext('2d');
+        const im = x.createImageData(W, H);
+        for (let p = 0; p < W * H; p++) {
+          const on = src[p] ? 255 : 0;
+          im.data[p * 4] = im.data[p * 4 + 1] = im.data[p * 4 + 2] = on;
+          im.data[p * 4 + 3] = on;
+        }
         x.putImageData(im, 0, 0);
-        // despeckle the snapped band lightly: blur+threshold
+        return c;
+      };
+      const pass = (src, thr) => {
         const t = document.createElement('canvas');
         t.width = W; t.height = H;
         const tx = t.getContext('2d');
-        tx.filter = 'blur(1.2px)';
-        tx.drawImage(c, 0, 0);
-        const td = tx.getImageData(0, 0, W, H);
-        for (let i = 0; i < td.data.length; i += 4) {
-          const keep = td.data[i + 3] > 120;
-          td.data[i] = td.data[i + 1] = td.data[i + 2] = keep ? 255 : 0;
-          td.data[i + 3] = keep ? 255 : 0;
-        }
-        x.clearRect(0, 0, W, H);
-        x.putImageData(td, 0, 0);
+        tx.filter = 'blur(5px)';
+        tx.drawImage(src, 0, 0);
+        const td = tx.getImageData(0, 0, W, H).data;
+        const o = new Uint8Array(W * H);
+        for (let p = 0; p < W * H; p++) o[p] = td[p * 4 + 3] > thr ? 1 : 0;
+        return o;
+      };
+      const dil = pass(draw(m), 20);
+      const closed = pass(draw(dil), 235);
+      let added = 0;
+      for (let p = 0; p < W * H; p++) {
+        if (closed[p] && !m[p] && !keepOut[p]) { m[p] = 1; added++; }
       }
+      return added;
+    };
 
+    // 4) light despeckle + soft edge, then export
+    const toPng = m => {
+      const c = document.createElement('canvas');
+      c.width = W; c.height = H;
+      const x = c.getContext('2d');
+      const im = x.createImageData(W, H);
+      for (let p = 0; p < W * H; p++) {
+        const i = p * 4;
+        const on = m[p] ? 255 : 0;
+        im.data[i] = im.data[i + 1] = im.data[i + 2] = on;
+        im.data[i + 3] = on;
+      }
+      x.putImageData(im, 0, 0);
+      const t = document.createElement('canvas');
+      t.width = W; t.height = H;
+      const tx = t.getContext('2d');
+      tx.filter = 'blur(1px)';
+      tx.drawImage(c, 0, 0);
+      const td = tx.getImageData(0, 0, W, H);
+      for (let i = 0; i < td.data.length; i += 4) {
+        const keep = td.data[i + 3] > 110;
+        td.data[i] = td.data[i + 1] = td.data[i + 2] = keep ? 255 : 0;
+        td.data[i + 3] = keep ? 255 : 0;
+      }
+      tx.putImageData(td, 0, 0);
       const s = document.createElement('canvas');
       s.width = W; s.height = H;
       const sx = s.getContext('2d');
       sx.filter = 'blur(0.7px)';
-      sx.drawImage(c, 0, 0);
+      sx.drawImage(t, 0, 0);
       return s.toDataURL('image/png');
     };
 
+    const fab = extract(pix(fabImg), 'fabric');
+    const wood = extract(pix(woodImg), 'wood');
+    const stats = { droppedFabric: fab.dropped, droppedWood: wood.dropped, holes: {} };
     const res = {};
-    for (const [prod, regs] of Object.entries(REGIONS)) {
-      res[prod] = { fabric: make(regs.fabric, prod), wood: make(regs.wood, null) };
+    for (const prod of ['sofa', 'chair']) {
+      stats.holes[prod + 'Fabric'] = fillHoles(fab.masks[prod]);
+      stats.holes[prod + 'Bridged'] = closeInto(wood.masks[prod], fab.masks[prod]);
+      // union in the traced wood, except where the painted fabric wins
+      let unioned = 0;
+      const wm = wood.masks[prod], pw = polyWood[prod];
+      for (let p = 0; p < W * H; p++) {
+        if (pw[p] && !wm[p] && !fab.masks.sofa[p] && !fab.masks.chair[p]) { wm[p] = 1; unioned++; }
+      }
+      stats.holes[prod + 'PolyUnion'] = unioned;
+      stats.holes[prod + 'Wood'] = fillHoles(wood.masks[prod]);
+      res[prod] = { fabric: toPng(fab.masks[prod]), wood: toPng(wood.masks[prod]) };
     }
+    res.stats = stats;
     return res;
-  }, { REGIONS, photoB64 });
+  }, {
+    REGIONS,
+    fabB64: b64('/home/user/sideways-colors/tools/mask-sources/fabric-white.png'),
+    woodB64: b64('/home/user/sideways-colors/tools/mask-sources/wood-white.png'),
+  });
 
-  for (const [prod, m] of Object.entries(out)) {
+  console.log('stats:', JSON.stringify(out.stats));
+  for (const prod of ['sofa', 'chair']) {
     fs.writeFileSync(`/home/user/sideways-colors/public/masks/lr-${prod}-fabric.png`,
-      Buffer.from(m.fabric.split(',')[1], 'base64'));
+      Buffer.from(out[prod].fabric.split(',')[1], 'base64'));
     fs.writeFileSync(`/home/user/sideways-colors/public/masks/lr-${prod}-wood.png`,
-      Buffer.from(m.wood.split(',')[1], 'base64'));
+      Buffer.from(out[prod].wood.split(',')[1], 'base64'));
     console.log(prod, 'masks written');
   }
   await browser.close();
