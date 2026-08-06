@@ -79,9 +79,13 @@ const REGIONS = require('./lr-regions.js');
       for (let p = 0; p < W * H; p++) m[p] = d[p * 4 + 3] > 128 ? 1 : 0;
       return m;
     };
+    // the sofa's legacy bottom-rail band (index 3) is traced a few px
+    // low – the painted wood covers the rail better, so it votes and
+    // bounds but is not unioned in
+    const UNION_SKIP = { sofa: [3], chair: [] };
     const polyWood = {
-      sofa: rasterizeExact(REGIONS.sofa.wood),
-      chair: rasterizeExact(REGIONS.chair.wood),
+      sofa: rasterizeExact(REGIONS.sofa.wood.filter((_, i) => !UNION_SKIP.sofa.includes(i))),
+      chair: rasterizeExact(REGIONS.chair.wood.filter((_, i) => !UNION_SKIP.chair.includes(i))),
     };
 
     const MIN_COMPONENT = 40; // px – drop speckle below this
@@ -238,10 +242,11 @@ const REGIONS = require('./lr-regions.js');
 
     const fab = extract(pix(fabImg), 'fabric');
     const wood = extract(pix(woodImg), 'wood');
-    // carve painted-fabric spill that is really wood (see fabricCarve)
+    // the thin top rims (wood region 0 of each product) sit under a
+    // slight overlap of the painted fabric – carve them out of the
+    // fabric masks so the rims render solidly as wood
     for (const prod of ['sofa', 'chair']) {
-      if (!REGIONS[prod].fabricCarve) continue;
-      const carve = rasterizeExact(REGIONS[prod].fabricCarve);
+      const carve = rasterizeExact([REGIONS[prod].wood[0]]);
       for (let p = 0; p < W * H; p++) if (carve[p]) fab.masks[prod][p] = 0;
     }
     const stats = { droppedFabric: fab.dropped, droppedWood: wood.dropped, holes: {} };
@@ -255,7 +260,7 @@ const REGIONS = require('./lr-regions.js');
       const x = c.getContext('2d');
       x.fillStyle = '#fff';
       x.strokeStyle = '#fff';
-      x.lineWidth = 18;
+      x.lineWidth = 12;
       x.lineJoin = 'round';
       for (const poly of REGIONS[prod].wood) {
         x.beginPath();
@@ -284,6 +289,12 @@ const REGIONS = require('./lr-regions.js');
       const bound = woodBound[prod];
       for (let p = 0; p < W * H; p++) if (wm[p] && !bound[p]) { wm[p] = 0; bounded++; }
       stats.holes[prod + 'Bounded'] = bounded;
+    }
+    // nothing of the sofa's wood lies right of its end post's outer edge;
+    // clip so paint slop cannot wash over the sofa/chair shadow gap
+    const SOFA_WOOD_MAX_X = 856;
+    for (let y = 0; y < H; y++) {
+      for (let x2 = SOFA_WOOD_MAX_X; x2 < W; x2++) wood.masks.sofa[y * W + x2] = 0;
     }
     // the chair stands in front of the sofa's right end – in any overlap
     // the chair's masks win, so sofa wood/fabric cannot bleed onto it
