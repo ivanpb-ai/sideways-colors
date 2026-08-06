@@ -5,9 +5,9 @@
 // The masks follow the paint faithfully. Wood is extracted in two tiers:
 // flat white, plus pixels the painting clearly brightened where the base
 // photo is plausibly wood (the painted wood is lighter than the photo's).
-// The polygons in lr-regions.js only vote on which product each painted
-// component belongs to; the sole traced shape still unioned in is each
-// product's thin top rim (region 0), which the painting does not cover.
+// The polygons in lr-regions.js are never unioned into a mask: `fabric`
+// and `wood` only vote on which product each painted component belongs to,
+// and `rim` is the search window for the top-edge snap below.
 const { chromium } = require('playwright');
 const fs = require('fs');
 const REGIONS = require('./lr-regions.js');
@@ -64,28 +64,12 @@ const REGIONS = require('./lr-regions.js');
       for (let p = 0; p < W * H; p++) m[p] = d[p * 4 + 3] > 128 ? 1 : 0;
       return m;
     };
-    const rasterizeExact = polys => {
-      const c = document.createElement('canvas');
-      c.width = W; c.height = H;
-      const x = c.getContext('2d');
-      x.fillStyle = '#fff';
-      for (const poly of polys) {
-        x.beginPath();
-        poly.forEach(([px, py], i) => (i ? x.lineTo(px, py) : x.moveTo(px, py)));
-        x.closePath();
-        x.fill();
-      }
-      const d = x.getImageData(0, 0, W, H).data;
-      const m = new Uint8Array(W * H);
-      for (let p = 0; p < W * H; p++) m[p] = d[p * 4 + 3] > 128 ? 1 : 0;
-      return m;
-    };
     const oracle = {};
     for (const prod of ['sofa', 'chair']) {
       oracle[prod] = {
-        fabric: rasterize(REGIONS[prod].fabric),
+        fabric: rasterize([...REGIONS[prod].fabric, ...REGIONS[prod].rim]),
         wood: rasterize(REGIONS[prod].wood),
-        any: rasterize([...REGIONS[prod].fabric, ...REGIONS[prod].wood]),
+        any: rasterize([...REGIONS[prod].fabric, ...REGIONS[prod].rim, ...REGIONS[prod].wood]),
       };
     }
 
@@ -247,27 +231,55 @@ const REGIONS = require('./lr-regions.js');
       return s.toDataURL('image/png');
     };
 
+    // Neither frame has a crest rail – the upholstery rolls straight over
+    // the back's top edge – but the painting stops a few px shy of that
+    // silhouette on both. Unrecolored, the leftover strip reads as a wood
+    // rim glued along the back: a salmon piping on the sofa, a mauve one on
+    // the chair. Inside the `rim` search window, take the paint's own top
+    // rows as the reference upholstery color and walk each column upwards
+    // while the photo still matches it. The first row that doesn't is
+    // whatever stands behind the frame, so the fabric ends just below.
+    const snapTop = (m, zone) => {
+      const TOL = 34; // RGB distance at which we've left the upholstery
+      const MAX = 8; // further than the paint could plausibly have missed
+      const REF = 4; // rows of paint averaged for the reference color
+      let added = 0;
+      for (let x = 0; x < W; x++) {
+        let y0 = -1;
+        for (let y = 0; y < H; y++) {
+          const p = y * W + x;
+          if (zone[p] && m[p]) { y0 = y; break; }
+        }
+        if (y0 < 0) continue;
+        let rr = 0, rg = 0, rb = 0, n = 0;
+        for (let y = y0; y < y0 + REF && y < H; y++) {
+          const i = (y * W + x) * 4;
+          rr += bd[i]; rg += bd[i + 1]; rb += bd[i + 2]; n++;
+        }
+        rr /= n; rg /= n; rb /= n;
+        let y = y0;
+        while (y > 0 && y0 - (y - 1) <= MAX && zone[(y - 1) * W + x]) {
+          const i = ((y - 1) * W + x) * 4;
+          const dr = bd[i] - rr, dg = bd[i + 1] - rg, db = bd[i + 2] - rb;
+          if (Math.sqrt(dr * dr + dg * dg + db * db) > TOL) break;
+          y--;
+        }
+        for (let yy = y; yy < y0; yy++) {
+          const p = yy * W + x;
+          if (!m[p]) { m[p] = 1; added++; }
+        }
+      }
+      return added;
+    };
+
     const fab = split(fabWhite, 'fabric');
     const wood = split(woodWhite, 'wood');
     const stats = { droppedFabric: fab.dropped, droppedWood: wood.dropped, holes: {} };
 
     for (const prod of ['sofa', 'chair']) {
-      // the thin top rim (wood region 0) is not in the painting: union
-      // it in and carve it from the fabric so it renders solidly as wood
-      const rim = rasterizeExact([REGIONS[prod].wood[0]]);
-      for (let p = 0; p < W * H; p++) {
-        if (rim[p]) {
-          fab.masks[prod][p] = 0;
-          wood.masks[prod][p] = 1;
-        }
-      }
-      // let the rim reach down into the unclaimed seam above the fabric
-      // (but never onto the painted fabric itself)
-      for (let shift = 1; shift <= 3; shift++) {
-        for (let p = shift * W; p < W * H; p++) {
-          if (rim[p - shift * W] && !fab.masks[prod][p]) wood.masks[prod][p] = 1;
-        }
-      }
+      // rasterize() strokes as well as fills, so the band comes out dilated
+      // by ~8px – wide enough to bracket both the paint and the silhouette
+      stats.holes[prod + 'Snapped'] = snapTop(fab.masks[prod], rasterize(REGIONS[prod].rim));
       stats.holes[prod + 'Fabric'] = fillHoles(fab.masks[prod]);
       stats.holes[prod + 'Bridged'] = closeInto(wood.masks[prod], fab.masks[prod]);
       stats.holes[prod + 'Wood'] = fillHoles(wood.masks[prod], fab.masks[prod]);
