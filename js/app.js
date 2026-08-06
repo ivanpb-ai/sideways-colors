@@ -18,6 +18,11 @@ const state = {
 
 const LS_STATE = "sideways.configs.v2";
 
+// UI-only: which fabric's palette is open in the chooser (not persisted).
+// null = no fabric picked yet, colors stay hidden.
+let fabricBrowse = null;
+let fabricBrowseProduct = null;
+
 function findFabric(fabricId) {
   return FABRICS.find((f) => f.id === fabricId);
 }
@@ -482,53 +487,64 @@ function renderFinishSwatches() {
 
 function renderFabricChips() {
   if (state.activeProduct === "table") return;
-  const cfg = state.configs[state.activeProduct];
+  // close the palette when the user switches product
+  if (fabricBrowseProduct !== state.activeProduct) {
+    fabricBrowseProduct = state.activeProduct;
+    fabricBrowse = null;
+  }
   const el = document.getElementById("fabric-chips");
   el.innerHTML = "";
   FABRICS.forEach((f) => {
     const btn = document.createElement("button");
     btn.textContent = f.name;
-    btn.classList.toggle("active", cfg.fabricId === f.id);
+    btn.classList.toggle("active", fabricBrowse === f.id);
     btn.addEventListener("click", () => {
-      cfg.fabricId = f.id;
-      cfg.code = f.colors[0].id;
+      fabricBrowse = fabricBrowse === f.id ? null : f.id;
       update();
     });
     el.appendChild(btn);
   });
-  document.getElementById("fabric-info").textContent = findFabric(cfg.fabricId).info;
+  document.getElementById("fabric-info").textContent = fabricBrowse
+    ? findFabric(fabricBrowse).info
+    : "Välj ett tyg för att visa alla kulörer.";
+  document.querySelector(".fabric-panel").classList.toggle("browsing", !!fabricBrowse);
 }
 
 function renderColorSwatches() {
   if (state.activeProduct === "table") return;
   const cfg = state.configs[state.activeProduct];
-  const fabric = findFabric(cfg.fabricId);
+  document.getElementById("color-block").hidden = !fabricBrowse;
   const el = document.getElementById("color-swatches");
   el.innerHTML = "";
-  fabric.colors.forEach((c) => {
-    const btn = document.createElement("button");
-    btn.className = "swatch";
-    btn.title = `${fabric.name} ${c.code}`;
-    btn.setAttribute("aria-label", btn.title);
-    btn.classList.toggle("active", cfg.code === c.id);
-    const img = document.createElement("img");
-    img.src = c.tile;
-    img.alt = "";
-    img.loading = "lazy";
-    btn.appendChild(img);
-    const label = document.createElement("span");
-    label.textContent = c.code;
-    btn.appendChild(label);
-    btn.addEventListener("click", () => {
-      cfg.code = c.id;
-      update();
+  if (fabricBrowse) {
+    const fabric = findFabric(fabricBrowse);
+    fabric.colors.forEach((c) => {
+      const btn = document.createElement("button");
+      btn.className = "swatch";
+      btn.title = `${fabric.name} ${c.code}`;
+      btn.setAttribute("aria-label", btn.title);
+      btn.classList.toggle("active", cfg.fabricId === fabric.id && cfg.code === c.id);
+      const img = document.createElement("img");
+      img.src = c.tile;
+      img.alt = "";
+      img.loading = "lazy";
+      btn.appendChild(img);
+      const label = document.createElement("span");
+      label.textContent = c.code;
+      btn.appendChild(label);
+      btn.addEventListener("click", () => {
+        cfg.fabricId = fabric.id;
+        cfg.code = c.id;
+        update();
+      });
+      el.appendChild(btn);
     });
-    el.appendChild(btn);
-  });
+  }
 
+  const selFabric = findFabric(cfg.fabricId);
   const color = findColor(cfg);
   document.getElementById("selected-color-label").innerHTML =
-    `Vald: <b>${fabric.name} ${color.code}</b>`;
+    `Vald: <b>${selFabric.name} ${color.code}</b>`;
 }
 
 function renderWoodSwatches() {
