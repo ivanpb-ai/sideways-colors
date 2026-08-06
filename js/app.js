@@ -354,6 +354,24 @@ function loadScene() {
           meanWoodLum: meanRawLumOf(woodData, { data: orig.data }),
         };
       });
+      // both frames share one photo and one light: normalize their wood
+      // against a common mean so the same finish matches across the
+      // sofa/chair junction instead of shifting brightness per region
+      {
+        let sum = 0, weight = 0;
+        names.forEach((n) => {
+          const wd = regions[n].woodData.data;
+          const od = orig.data;
+          for (let i = 0; i < od.length; i += 4) {
+            const a = wd[i + 3] / 255;
+            if (!a) continue;
+            sum += a * (0.2126 * od[i] + 0.7152 * od[i + 1] + 0.0722 * od[i + 2]) / 255;
+            weight += a;
+          }
+        });
+        const shared = Math.max(0.05, weight ? sum / weight : 0.6);
+        names.forEach((n) => { regions[n].meanWoodLum = shared; });
+      }
       return { w, h, orig, lumMap, regions };
     })();
   }
