@@ -280,6 +280,49 @@ const REGIONS = require('./lr-regions.js');
       stats.holes[prod + 'WoodWins'] = woodWins;
     }
 
+    // the painted wood lines run a few px fatter than the real members –
+    // slim them by ~1px (interiors like the slat panel are hole-filled
+    // solid, so only outlines are affected)
+    const erode1 = m => {
+      const c = document.createElement('canvas');
+      c.width = W; c.height = H;
+      const x = c.getContext('2d');
+      const im = x.createImageData(W, H);
+      for (let p = 0; p < W * H; p++) {
+        const on = m[p] ? 255 : 0;
+        im.data[p * 4] = im.data[p * 4 + 1] = im.data[p * 4 + 2] = on;
+        im.data[p * 4 + 3] = on;
+      }
+      x.putImageData(im, 0, 0);
+      const t = document.createElement('canvas');
+      t.width = W; t.height = H;
+      const tx = t.getContext('2d');
+      tx.filter = 'blur(1px)';
+      tx.drawImage(c, 0, 0);
+      const td = tx.getImageData(0, 0, W, H).data;
+      let removed = 0;
+      for (let p = 0; p < W * H; p++) {
+        if (m[p] && td[p * 4 + 3] <= 200) { m[p] = 0; removed++; }
+      }
+      return removed;
+    };
+    stats.holes.sofaWoodEroded = erode1(wood.masks.sofa);
+    stats.holes.chairWoodEroded = erode1(wood.masks.chair);
+
+    // deep shadow stays shadow: recoloring near-black pixels only lifts
+    // them unnaturally, and unpainted they read correctly in any finish
+    let shadowDropped = 0;
+    for (let p = 0; p < W * H; p++) {
+      if (!wood.masks.sofa[p] && !wood.masks.chair[p]) continue;
+      const i = p * 4;
+      if (Math.max(bd[i], bd[i + 1], bd[i + 2]) < 69) {
+        wood.masks.sofa[p] = 0;
+        wood.masks.chair[p] = 0;
+        shadowDropped++;
+      }
+    }
+    stats.holes.shadowDropped = shadowDropped;
+
     // nothing of the sofa's wood lies right of its end post's outer edge
     const SOFA_WOOD_MAX_X = 856;
     for (let y = 0; y < H; y++) {
