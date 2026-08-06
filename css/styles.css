@@ -255,18 +255,16 @@ body {
   padding: 20px 22px;
 }
 /* The wood choice lives in its own card */
-.wood-panel {
-  border: 2px solid var(--accent);
-}
 .wood-panel .control-block { margin-bottom: 0; }
-.wood-panel h3 { color: var(--accent); }
-/* While a fabric is picked and its palette is open, the fabric card's
-   frame is highlighted (box-shadow ring: no layout shift) */
-.fabric-panel.browsing {
+/* Exactly one sidebar area carries the selection highlight at a time —
+   the last one clicked (box-shadow ring: no layout shift) */
+.wood-panel.active,
+.fabric-panel.active {
   border-color: var(--accent);
   box-shadow: 0 0 0 1px var(--accent), 0 4px 16px rgba(138, 106, 76, 0.2);
 }
-.fabric-panel.browsing #fabric-block h3 { color: var(--accent); }
+.wood-panel.active h3,
+.fabric-panel.active #fabric-block h3 { color: var(--accent); }
 .control-block { margin-bottom: 22px; }
 .control-block:last-child { margin-bottom: 0; }
 .control-block h3 {

@@ -22,6 +22,13 @@ const LS_STATE = "sideways.configs.v2";
 // null = no fabric picked yet, colors stay hidden.
 let fabricBrowse = null;
 let fabricBrowseProduct = null;
+// UI-only: which sidebar area carries the selection highlight
+let activeArea = "wood"; // "wood" | "fabric"
+
+function updateAreaHighlight() {
+  document.getElementById("wood-block").classList.toggle("active", activeArea === "wood");
+  document.querySelector(".fabric-panel").classList.toggle("active", activeArea === "fabric");
+}
 
 function findFabric(fabricId) {
   return FABRICS.find((f) => f.id === fabricId);
@@ -507,7 +514,7 @@ function renderFabricChips() {
   document.getElementById("fabric-info").textContent = fabricBrowse
     ? findFabric(fabricBrowse).info
     : "Välj ett tyg för att visa alla kulörer.";
-  document.querySelector(".fabric-panel").classList.toggle("browsing", !!fabricBrowse);
+  updateAreaHighlight();
 }
 
 function renderColorSwatches() {
@@ -715,6 +722,17 @@ document.getElementById("card-table").addEventListener("click", () => {
 document.getElementById("pick-table").addEventListener("click", () => {
   state.activeProduct = "table";
   renderControls();
+});
+
+// only one sidebar area carries the highlight at a time; clicking
+// anywhere inside a card (not just its swatches) claims it
+document.getElementById("wood-block").addEventListener("click", () => {
+  activeArea = "wood";
+  updateAreaHighlight();
+});
+document.querySelector(".fabric-panel").addEventListener("click", () => {
+  activeArea = "fabric";
+  updateAreaHighlight();
 });
 
 document.getElementById("apply-both").addEventListener("click", () => {
