@@ -139,14 +139,18 @@ const REGIONS = require('./lr-regions.js');
 
     // 3) fill enclosed holes: shading creases inside the painted white,
     // and for the wood panel also the slat gaps (rendered as wood, whose
-    // luminance-preserving recolor keeps them reading as shadowed depth)
-    const fillHoles = m => {
+    // luminance-preserving recolor keeps them reading as shadowed depth).
+    // `outside` pixels (the same product's fabric) count as reachable
+    // exterior, so a closed wood ring around the upholstery can never
+    // flood-fill the fabric itself.
+    const fillHoles = (m, outside) => {
       const seen = new Uint8Array(W * H);
       const stack = new Int32Array(W * H);
       let sp = 0;
       const push = p => { if (!m[p] && !seen[p]) { seen[p] = 1; stack[sp++] = p; } };
       for (let x = 0; x < W; x++) { push(x); push((H - 1) * W + x); }
       for (let y = 0; y < H; y++) { push(y * W); push(y * W + W - 1); }
+      if (outside) for (let p = 0; p < W * H; p++) if (outside[p]) push(p);
       while (sp) {
         const q = stack[--sp];
         const qx = q % W;
@@ -234,6 +238,12 @@ const REGIONS = require('./lr-regions.js');
 
     const fab = extract(pix(fabImg), 'fabric');
     const wood = extract(pix(woodImg), 'wood');
+    // carve painted-fabric spill that is really wood (see fabricCarve)
+    for (const prod of ['sofa', 'chair']) {
+      if (!REGIONS[prod].fabricCarve) continue;
+      const carve = rasterizeExact(REGIONS[prod].fabricCarve);
+      for (let p = 0; p < W * H; p++) if (carve[p]) fab.masks[prod][p] = 0;
+    }
     const stats = { droppedFabric: fab.dropped, droppedWood: wood.dropped, holes: {} };
     // allowed reach of each product's wood: the traced regions dilated
     // ~9px – the paint refines placement inside this bound, but slop
@@ -269,7 +279,7 @@ const REGIONS = require('./lr-regions.js');
         if (pw[p] && !wm[p] && !fab.masks.sofa[p] && !fab.masks.chair[p]) { wm[p] = 1; unioned++; }
       }
       stats.holes[prod + 'PolyUnion'] = unioned;
-      stats.holes[prod + 'Wood'] = fillHoles(wood.masks[prod]);
+      stats.holes[prod + 'Wood'] = fillHoles(wood.masks[prod], fab.masks[prod]);
       let bounded = 0;
       const bound = woodBound[prod];
       for (let p = 0; p < W * H; p++) if (wm[p] && !bound[p]) { wm[p] = 0; bounded++; }

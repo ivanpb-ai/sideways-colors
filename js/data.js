@@ -1,5 +1,5 @@
 // Bump when any mask/asset in public/ changes, so browsers refetch them.
-const ASSET_VERSION = "4";
+const ASSET_VERSION = "5";
 
 /*
  * Data for the Sideways color configurator.
