@@ -18,10 +18,12 @@ En webbapp för att konfigurera **RF1903-L Sideways Soffa**,
   Trästommen färgas om via egna masker med bevarad ådring.
   Vardagsrummets masker genereras av `tools/lr-masks.js` ur två målade
   maskbilder i `tools/mask-sources/` (tyget respektive träet övermålat i
-  vitt). Vitt extraheras, städas (brusborttagning, hålfyllnad,
-  gap-överbryggning i träet) och delas per möbel; polygonerna i
-  `tools/lr-regions.js` används bara för att rösta om vilken möbel varje
-  vit komponent tillhör samt som kontinuitetsgaranti för smala trädelar.
+  vitt). Vitt extraheras i två steg (helvitt, plus tydligt uppljusade
+  träpixlar där basfotot ser ut som trä), städas (brusborttagning,
+  hålfyllnad, gap-överbryggning) och delas per möbel; polygonerna i
+  `tools/lr-regions.js` röstar bara om vilken möbel varje målad
+  komponent tillhör, och de tunna topplisterna (som målningen saknar)
+  läggs till från varsin ritad kantremsa.
 - **10 tyger, 326 kulörer:** Canvas 2, Canvas Natur, Capture, Clara 2,
   Divina Melange 3, Fiord 2, Hallingdal 65, Mood, Remix 3 och Re-wool,
   grupperade per tyg i väljaren och sorterade efter färgnummer.

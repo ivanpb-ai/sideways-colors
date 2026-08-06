@@ -1,11 +1,13 @@
 // Generate soft fabric/wood masks for both products in the living room
 // scene from the painted mask sources in tools/mask-sources/:
 //   fabric-white.png – the scene with all upholstery painted flat white
-//   wood-white.png   – the scene with all visible wood painted flat white
-// White pixels are extracted, cleaned up (despeckle, enclosed-hole fill)
-// and split per product. The hand-traced polygons in lr-regions.js are
-// no longer the masks themselves – they only vote on which product each
-// white component belongs to.
+//   wood-white.png   – the scene with all visible wood painted white
+// The masks follow the paint faithfully. Wood is extracted in two tiers:
+// flat white, plus pixels the painting clearly brightened where the base
+// photo is plausibly wood (the painted wood is lighter than the photo's).
+// The polygons in lr-regions.js only vote on which product each painted
+// component belongs to; the sole traced shape still unioned in is each
+// product's thin top rim (region 0), which the painting does not cover.
 const { chromium } = require('playwright');
 const fs = require('fs');
 const REGIONS = require('./lr-regions.js');
@@ -14,14 +16,14 @@ const REGIONS = require('./lr-regions.js');
   const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium' });
   const page = await browser.newPage();
   const b64 = f => fs.readFileSync(f).toString('base64');
-  const out = await page.evaluate(async ({ REGIONS, fabB64, woodB64 }) => {
+  const out = await page.evaluate(async ({ REGIONS, fabB64, woodB64, baseB64 }) => {
     const W = 1152, H = 928;
     const load = d => new Promise(r => {
       const i = new Image();
       i.onload = () => r(i);
       i.src = 'data:image/png;base64,' + d;
     });
-    const [fabImg, woodImg] = await Promise.all([load(fabB64), load(woodB64)]);
+    const [fabImg, woodImg, baseImg] = await Promise.all([load(fabB64), load(woodB64), load(baseB64)]);
     const pix = im => {
       const c = document.createElement('canvas');
       c.width = W; c.height = H;
@@ -29,9 +31,19 @@ const REGIONS = require('./lr-regions.js');
       x.drawImage(im, 0, 0, W, H);
       return x.getImageData(0, 0, W, H).data;
     };
+    const rgb2hsv = (r, g, b) => {
+      const mx = Math.max(r, g, b), mn = Math.min(r, g, b), df = mx - mn;
+      let h = 0;
+      if (df > 0) {
+        if (mx === r) h = ((g - b) / df) % 6;
+        else if (mx === g) h = (b - r) / df + 2;
+        else h = (r - g) / df + 4;
+        h *= 60; if (h < 0) h += 360;
+      }
+      return [h, mx === 0 ? 0 : df / mx, mx / 255];
+    };
 
-    // rasterize each product's polygons, dilated a little, as the
-    // component-to-product voting oracle
+    // product-voting oracle: traced regions dilated a little
     const rasterize = polys => {
       const c = document.createElement('canvas');
       c.width = W; c.height = H;
@@ -52,17 +64,6 @@ const REGIONS = require('./lr-regions.js');
       for (let p = 0; p < W * H; p++) m[p] = d[p * 4 + 3] > 128 ? 1 : 0;
       return m;
     };
-    const oracle = {};
-    for (const prod of ['sofa', 'chair']) {
-      oracle[prod] = {
-        fabric: rasterize(REGIONS[prod].fabric),
-        wood: rasterize(REGIONS[prod].wood),
-        any: rasterize([...REGIONS[prod].fabric, ...REGIONS[prod].wood]),
-      };
-    }
-    // exact (undilated) wood polygons – unioned into the painted wood
-    // below, so thin members (rails, posts) stay continuous even where
-    // the paint is patchy
     const rasterizeExact = polys => {
       const c = document.createElement('canvas');
       c.width = W; c.height = H;
@@ -79,25 +80,41 @@ const REGIONS = require('./lr-regions.js');
       for (let p = 0; p < W * H; p++) m[p] = d[p * 4 + 3] > 128 ? 1 : 0;
       return m;
     };
-    // the sofa's legacy bottom-rail band (index 3) is traced a few px
-    // low – the painted wood covers the rail better, so it votes and
-    // bounds but is not unioned in
-    const UNION_SKIP = { sofa: [3], chair: [] };
-    const polyWood = {
-      sofa: rasterizeExact(REGIONS.sofa.wood.filter((_, i) => !UNION_SKIP.sofa.includes(i))),
-      chair: rasterizeExact(REGIONS.chair.wood.filter((_, i) => !UNION_SKIP.chair.includes(i))),
-    };
+    const oracle = {};
+    for (const prod of ['sofa', 'chair']) {
+      oracle[prod] = {
+        fabric: rasterize(REGIONS[prod].fabric),
+        wood: rasterize(REGIONS[prod].wood),
+        any: rasterize([...REGIONS[prod].fabric, ...REGIONS[prod].wood]),
+      };
+    }
 
-    const MIN_COMPONENT = 40; // px – drop speckle below this
+    const fd = pix(fabImg), wd = pix(woodImg), bd = pix(baseImg);
 
-    const extract = (data, kind) => {
-      // 1) threshold: painted-white pixels
-      const white = new Uint8Array(W * H);
-      for (let p = 0; p < W * H; p++) {
-        const i = p * 4;
-        if (Math.min(data[i], data[i + 1], data[i + 2]) > 230) white[p] = 1;
+    // painted-pixel candidates
+    const fabWhite = new Uint8Array(W * H);
+    const woodWhite = new Uint8Array(W * H);
+    for (let p = 0; p < W * H; p++) {
+      const i = p * 4;
+      if (Math.min(fd[i], fd[i + 1], fd[i + 2]) > 228) fabWhite[p] = 1;
+      const mn = Math.min(wd[i], wd[i + 1], wd[i + 2]);
+      if (mn > 228) { woodWhite[p] = 1; continue; }
+      if (mn > 135) {
+        const [, s1] = rgb2hsv(wd[i], wd[i + 1], wd[i + 2]);
+        if (s1 < 0.30) {
+          const dsum = (wd[i] + wd[i + 1] + wd[i + 2]) - (bd[i] + bd[i + 1] + bd[i + 2]);
+          if (dsum > 100) {
+            const [hb, sb, vb] = rgb2hsv(bd[i], bd[i + 1], bd[i + 2]);
+            if (hb >= 15 && hb <= 55 && sb >= 0.15 && vb >= 0.2) woodWhite[p] = 1;
+          }
+        }
       }
-      // 2) connected components; vote each onto a product (or drop it)
+    }
+
+    const MIN_COMPONENT = 40;
+
+    // split painted pixels into per-product masks by component voting
+    const split = (white, kind) => {
       const masks = { sofa: new Uint8Array(W * H), chair: new Uint8Array(W * H) };
       const lab = new Int32Array(W * H);
       const stack = new Int32Array(W * H);
@@ -114,15 +131,11 @@ const REGIONS = require('./lr-regions.js');
           for (const dq of [-1, 1, -W, W]) {
             const r = q + dq;
             if (r < 0 || r >= W * H || !white[r] || lab[r]) continue;
-            if (Math.abs((r % W) - qx) > 1) continue; // no row wrap
+            if (Math.abs((r % W) - qx) > 1) continue;
             lab[r] = 1; stack[sp++] = r;
           }
         }
         if (cnt < MIN_COMPONENT) { dropped++; continue; }
-        // majority vote against the polygon oracles. Wood fragments with
-        // no same-kind overlap fall back to the product's whole region;
-        // fabric has no fallback (the fabric behind the slat gaps is
-        // rendered as part of the wood panel, like before).
         let votes = { sofa: 0, chair: 0 };
         for (const q of members) {
           if (oracle.sofa[kind][q]) votes.sofa++;
@@ -134,19 +147,15 @@ const REGIONS = require('./lr-regions.js');
             if (oracle.chair.any[q]) votes.chair++;
           }
         }
-        if (!votes.sofa && !votes.chair) { dropped++; continue; } // scene white, not furniture
+        if (!votes.sofa && !votes.chair) { dropped++; continue; }
         const target = votes.sofa >= votes.chair ? masks.sofa : masks.chair;
         for (const q of members) target[q] = 1;
       }
       return { masks, dropped };
     };
 
-    // 3) fill enclosed holes: shading creases inside the painted white,
-    // and for the wood panel also the slat gaps (rendered as wood, whose
-    // luminance-preserving recolor keeps them reading as shadowed depth).
-    // `outside` pixels (the same product's fabric) count as reachable
-    // exterior, so a closed wood ring around the upholstery can never
-    // flood-fill the fabric itself.
+    // fill enclosed holes; `outside` pixels (the product's fabric) count
+    // as reachable exterior so a wood ring can never flood the upholstery
     const fillHoles = (m, outside) => {
       const seen = new Uint8Array(W * H);
       const stack = new Int32Array(W * H);
@@ -170,9 +179,8 @@ const REGIONS = require('./lr-regions.js');
       return filled;
     };
 
-    // 3b) morphological close (bridge gaps in the painted wood, e.g.
-    // where brush strokes missed parts of a rail) – but never into the
-    // same product's fabric, so the slat-gap/fabric boundary stays put
+    // morphological close: bridge small paint gaps, but never into the
+    // same product's fabric (keeps the slat-gap/fabric boundary put)
     const closeInto = (m, keepOut) => {
       const draw = src => {
         const c = document.createElement('canvas');
@@ -191,7 +199,7 @@ const REGIONS = require('./lr-regions.js');
         const t = document.createElement('canvas');
         t.width = W; t.height = H;
         const tx = t.getContext('2d');
-        tx.filter = 'blur(5px)';
+        tx.filter = 'blur(4px)';
         tx.drawImage(src, 0, 0);
         const td = tx.getImageData(0, 0, W, H).data;
         const o = new Uint8Array(W * H);
@@ -207,7 +215,6 @@ const REGIONS = require('./lr-regions.js');
       return added;
     };
 
-    // 4) light despeckle + soft edge, then export
     const toPng = m => {
       const c = document.createElement('canvas');
       c.width = W; c.height = H;
@@ -240,64 +247,45 @@ const REGIONS = require('./lr-regions.js');
       return s.toDataURL('image/png');
     };
 
-    const fab = extract(pix(fabImg), 'fabric');
-    const wood = extract(pix(woodImg), 'wood');
-    // the thin top rims (wood region 0 of each product) sit under a
-    // slight overlap of the painted fabric – carve them out of the
-    // fabric masks so the rims render solidly as wood
-    for (const prod of ['sofa', 'chair']) {
-      const carve = rasterizeExact([REGIONS[prod].wood[0]]);
-      for (let p = 0; p < W * H; p++) if (carve[p]) fab.masks[prod][p] = 0;
-    }
+    const fab = split(fabWhite, 'fabric');
+    const wood = split(woodWhite, 'wood');
     const stats = { droppedFabric: fab.dropped, droppedWood: wood.dropped, holes: {} };
-    // allowed reach of each product's wood: the traced regions dilated
-    // ~9px – the paint refines placement inside this bound, but slop
-    // (e.g. brush strokes on the carpet) cannot escape it
-    const woodBound = {};
+
     for (const prod of ['sofa', 'chair']) {
-      const c = document.createElement('canvas');
-      c.width = W; c.height = H;
-      const x = c.getContext('2d');
-      x.fillStyle = '#fff';
-      x.strokeStyle = '#fff';
-      x.lineWidth = 12;
-      x.lineJoin = 'round';
-      for (const poly of REGIONS[prod].wood) {
-        x.beginPath();
-        poly.forEach(([px, py], i) => (i ? x.lineTo(px, py) : x.moveTo(px, py)));
-        x.closePath();
-        x.fill();
-        x.stroke();
+      // the thin top rim (wood region 0) is not in the painting: union
+      // it in and carve it from the fabric so it renders solidly as wood
+      const rim = rasterizeExact([REGIONS[prod].wood[0]]);
+      for (let p = 0; p < W * H; p++) {
+        if (rim[p]) {
+          fab.masks[prod][p] = 0;
+          wood.masks[prod][p] = 1;
+        }
       }
-      const d = x.getImageData(0, 0, W, H).data;
-      const m = new Uint8Array(W * H);
-      for (let p = 0; p < W * H; p++) m[p] = d[p * 4 + 3] > 128 ? 1 : 0;
-      woodBound[prod] = m;
-    }
-    for (const prod of ['sofa', 'chair']) {
+      // let the rim reach down into the unclaimed seam above the fabric
+      // (but never onto the painted fabric itself)
+      for (let shift = 1; shift <= 3; shift++) {
+        for (let p = shift * W; p < W * H; p++) {
+          if (rim[p - shift * W] && !fab.masks[prod][p]) wood.masks[prod][p] = 1;
+        }
+      }
       stats.holes[prod + 'Fabric'] = fillHoles(fab.masks[prod]);
       stats.holes[prod + 'Bridged'] = closeInto(wood.masks[prod], fab.masks[prod]);
-      // union in the traced wood, except where the painted fabric wins
-      let unioned = 0;
-      const wm = wood.masks[prod], pw = polyWood[prod];
-      for (let p = 0; p < W * H; p++) {
-        if (pw[p] && !wm[p] && !fab.masks.sofa[p] && !fab.masks.chair[p]) { wm[p] = 1; unioned++; }
-      }
-      stats.holes[prod + 'PolyUnion'] = unioned;
       stats.holes[prod + 'Wood'] = fillHoles(wood.masks[prod], fab.masks[prod]);
-      let bounded = 0;
-      const bound = woodBound[prod];
-      for (let p = 0; p < W * H; p++) if (wm[p] && !bound[p]) { wm[p] = 0; bounded++; }
-      stats.holes[prod + 'Bounded'] = bounded;
+      // wood is fine lines painted precisely – in any leftover overlap
+      // the wood wins over the broader fabric fill
+      let woodWins = 0;
+      for (let p = 0; p < W * H; p++) {
+        if (wood.masks[prod][p] && fab.masks[prod][p]) { fab.masks[prod][p] = 0; woodWins++; }
+      }
+      stats.holes[prod + 'WoodWins'] = woodWins;
     }
-    // nothing of the sofa's wood lies right of its end post's outer edge;
-    // clip so paint slop cannot wash over the sofa/chair shadow gap
+
+    // nothing of the sofa's wood lies right of its end post's outer edge
     const SOFA_WOOD_MAX_X = 856;
     for (let y = 0; y < H; y++) {
       for (let x2 = SOFA_WOOD_MAX_X; x2 < W; x2++) wood.masks.sofa[y * W + x2] = 0;
     }
-    // the chair stands in front of the sofa's right end – in any overlap
-    // the chair's masks win, so sofa wood/fabric cannot bleed onto it
+    // the chair stands in front of the sofa – its masks win any overlap
     let ceded = 0;
     for (let p = 0; p < W * H; p++) {
       if (fab.masks.chair[p] || wood.masks.chair[p]) {
@@ -306,16 +294,17 @@ const REGIONS = require('./lr-regions.js');
       }
     }
     stats.holes.sofaCededToChair = ceded;
-    const res = {};
+
+    const res = { stats };
     for (const prod of ['sofa', 'chair']) {
       res[prod] = { fabric: toPng(fab.masks[prod]), wood: toPng(wood.masks[prod]) };
     }
-    res.stats = stats;
     return res;
   }, {
     REGIONS,
     fabB64: b64('/home/user/sideways-colors/tools/mask-sources/fabric-white.png'),
     woodB64: b64('/home/user/sideways-colors/tools/mask-sources/wood-white.png'),
+    baseB64: b64('/home/user/sideways-colors/public/living-room.png'),
   });
 
   console.log('stats:', JSON.stringify(out.stats));
