@@ -235,7 +235,30 @@ const REGIONS = require('./lr-regions.js');
     const fab = extract(pix(fabImg), 'fabric');
     const wood = extract(pix(woodImg), 'wood');
     const stats = { droppedFabric: fab.dropped, droppedWood: wood.dropped, holes: {} };
-    const res = {};
+    // allowed reach of each product's wood: the traced regions dilated
+    // ~9px – the paint refines placement inside this bound, but slop
+    // (e.g. brush strokes on the carpet) cannot escape it
+    const woodBound = {};
+    for (const prod of ['sofa', 'chair']) {
+      const c = document.createElement('canvas');
+      c.width = W; c.height = H;
+      const x = c.getContext('2d');
+      x.fillStyle = '#fff';
+      x.strokeStyle = '#fff';
+      x.lineWidth = 18;
+      x.lineJoin = 'round';
+      for (const poly of REGIONS[prod].wood) {
+        x.beginPath();
+        poly.forEach(([px, py], i) => (i ? x.lineTo(px, py) : x.moveTo(px, py)));
+        x.closePath();
+        x.fill();
+        x.stroke();
+      }
+      const d = x.getImageData(0, 0, W, H).data;
+      const m = new Uint8Array(W * H);
+      for (let p = 0; p < W * H; p++) m[p] = d[p * 4 + 3] > 128 ? 1 : 0;
+      woodBound[prod] = m;
+    }
     for (const prod of ['sofa', 'chair']) {
       stats.holes[prod + 'Fabric'] = fillHoles(fab.masks[prod]);
       stats.holes[prod + 'Bridged'] = closeInto(wood.masks[prod], fab.masks[prod]);
@@ -247,6 +270,23 @@ const REGIONS = require('./lr-regions.js');
       }
       stats.holes[prod + 'PolyUnion'] = unioned;
       stats.holes[prod + 'Wood'] = fillHoles(wood.masks[prod]);
+      let bounded = 0;
+      const bound = woodBound[prod];
+      for (let p = 0; p < W * H; p++) if (wm[p] && !bound[p]) { wm[p] = 0; bounded++; }
+      stats.holes[prod + 'Bounded'] = bounded;
+    }
+    // the chair stands in front of the sofa's right end – in any overlap
+    // the chair's masks win, so sofa wood/fabric cannot bleed onto it
+    let ceded = 0;
+    for (let p = 0; p < W * H; p++) {
+      if (fab.masks.chair[p] || wood.masks.chair[p]) {
+        if (wood.masks.sofa[p]) { wood.masks.sofa[p] = 0; ceded++; }
+        if (fab.masks.sofa[p]) { fab.masks.sofa[p] = 0; ceded++; }
+      }
+    }
+    stats.holes.sofaCededToChair = ceded;
+    const res = {};
+    for (const prod of ['sofa', 'chair']) {
       res[prod] = { fabric: toPng(fab.masks[prod]), wood: toPng(wood.masks[prod]) };
     }
     res.stats = stats;
