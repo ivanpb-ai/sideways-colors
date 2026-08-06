@@ -68,41 +68,47 @@
       </section>
     </div>
 
-    <aside class="controls" aria-label="Konfigurera">
-      <div class="control-block">
-        <h3>Produkt att konfigurera</h3>
-        <div class="segmented" id="product-tabs"></div>
+    <aside class="controls-col" aria-label="Konfigurera">
+      <div class="controls">
+        <div class="control-block">
+          <h3>Produkt att konfigurera</h3>
+          <div class="segmented" id="product-tabs"></div>
+        </div>
+
+        <div class="control-block" id="finish-block" hidden>
+          <h3>Utförande</h3>
+          <div class="finish-list" id="finish-swatches"></div>
+        </div>
       </div>
 
-      <div class="control-block" id="finish-block" hidden>
-        <h3>Utförande</h3>
-        <div class="finish-list" id="finish-swatches"></div>
+      <div class="controls wood-panel" id="wood-block">
+        <div class="control-block">
+          <h3>Trä</h3>
+          <div class="swatch-grid wood-grid" id="wood-swatches"></div>
+          <p class="selected-color" id="selected-wood-label"></p>
+        </div>
       </div>
 
-      <div class="control-block" id="fabric-block">
-        <h3>Tyg</h3>
-        <div class="chip-row" id="fabric-chips"></div>
-        <p class="fabric-info" id="fabric-info"></p>
-      </div>
+      <div class="controls fabric-panel">
+        <div class="control-block" id="fabric-block">
+          <h3>Tyg</h3>
+          <div class="chip-row" id="fabric-chips"></div>
+          <p class="fabric-info" id="fabric-info"></p>
+        </div>
 
-      <div class="control-block" id="color-block">
-        <h3>Färg</h3>
-        <div class="swatch-grid" id="color-swatches"></div>
-        <p class="selected-color" id="selected-color-label"></p>
-      </div>
+        <div class="control-block" id="color-block">
+          <h3>Färg</h3>
+          <div class="swatch-grid" id="color-swatches"></div>
+          <p class="selected-color" id="selected-color-label"></p>
+        </div>
 
-      <div class="control-block" id="wood-block">
-        <h3>Trä</h3>
-        <div class="swatch-grid wood-grid" id="wood-swatches"></div>
-        <p class="selected-color" id="selected-wood-label"></p>
-      </div>
+        <div class="control-block" id="apply-block">
+          <button class="apply-both" id="apply-both">Använd samma val på soffa och fåtölj</button>
+        </div>
 
-      <div class="control-block" id="apply-block">
-        <button class="apply-both" id="apply-both">Använd samma val på soffa och fåtölj</button>
+        <p class="fineprint">Stomme och flätad rygg i naturfärgat pappersgarn, som på fotona.
+          Tygprovets väv och kulör draperas över möblerna; fotonas ljus och skuggor bevaras.</p>
       </div>
-
-      <p class="fineprint">Stomme och flätad rygg i naturfärgat pappersgarn, som på fotona.
-        Tygprovets väv och kulör draperas över möblerna; fotonas ljus och skuggor bevaras.</p>
     </aside>
   </main>
 

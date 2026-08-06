@@ -241,18 +241,59 @@ body {
 }
 
 /* ---------- Controls ---------- */
-.controls {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 22px;
+.controls-col {
   align-self: start;
   position: sticky;
   top: 20px;
   max-height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+@media (max-width: 980px) {
+  .controls-col { position: static; max-height: none; }
+}
+.controls {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 20px 22px;
+}
+/* The wood choice lives in its own always-visible card */
+.wood-panel {
+  border: 2px solid var(--accent);
+  flex: 0 0 auto;
+}
+.wood-panel .control-block { margin-bottom: 0; }
+.wood-panel h3 { color: var(--accent); }
+/* Fabrics get their own card; the color grid scrolls inside it so the
+   wood card above never scrolls out of view */
+.fabric-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.fabric-panel #color-block {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.fabric-panel #color-swatches {
   overflow-y: auto;
+  min-height: 90px;
+  padding-right: 4px;
+}
+@media (max-width: 980px) {
+  .fabric-panel { overflow: visible; display: block; }
+  .fabric-panel #color-block { display: block; }
+  .fabric-panel #color-swatches { max-height: 45vh; }
 }
 .control-block { margin-bottom: 22px; }
+.control-block:last-child { margin-bottom: 0; }
 .control-block h3 {
   font-size: 11px;
   text-transform: uppercase;

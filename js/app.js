@@ -455,6 +455,7 @@ function renderProductTabs() {
   document.getElementById("color-block").hidden = isTable;
   document.getElementById("wood-block").hidden = isTable;
   document.getElementById("apply-block").hidden = isTable;
+  document.querySelector(".fabric-panel").hidden = isTable;
 }
 
 function renderFinishSwatches() {
