@@ -105,7 +105,9 @@ const REGIONS = require('./lr-regions.js');
           const dsum = (wd[i] + wd[i + 1] + wd[i + 2]) - (bd[i] + bd[i + 1] + bd[i + 2]);
           if (dsum > 100) {
             const [hb, sb, vb] = rgb2hsv(bd[i], bd[i + 1], bd[i + 2]);
-            if (hb >= 15 && hb <= 55 && sb >= 0.15 && vb >= 0.2) woodWhite[p] = 1;
+            // strictly oak-hued base only – rosy fabric shadow and the
+            // pink lamp table sit just below h=20 and must not qualify
+            if (hb >= 20 && hb <= 50 && sb >= 0.15 && vb >= 0.2) woodWhite[p] = 1;
           }
         }
       }
@@ -251,23 +253,34 @@ const REGIONS = require('./lr-regions.js');
     const wood = split(woodWhite, 'wood');
     const stats = { droppedFabric: fab.dropped, droppedWood: wood.dropped, holes: {} };
 
-    for (const prod of ['sofa', 'chair']) {
-      // the thin top rim (wood region 0) is not in the painting: union
-      // it in and carve it from the fabric so it renders solidly as wood
-      const rim = rasterizeExact([REGIONS[prod].wood[0]]);
-      for (let p = 0; p < W * H; p++) {
-        if (rim[p]) {
-          fab.masks[prod][p] = 0;
+    // The thin lit rim above the upholstery is missing from the painting.
+    // Derive it from the data instead of tracing it: walk up from the
+    // fabric's own top edge and take only pixels that really look like
+    // oak in the photo. Where there is no rim (background above the
+    // fabric, e.g. the lamp table behind the chair) nothing is claimed.
+    const addRim = prod => {
+      const fm = fab.masks[prod];
+      let added = 0;
+      for (let x = 0; x < W; x++) {
+        let top = -1;
+        for (let y = 0; y < H; y++) if (fm[y * W + x]) { top = y; break; }
+        if (top <= 0) continue;
+        for (let y = top - 1; y >= Math.max(0, top - 6); y--) {
+          const p = y * W + x;
+          if (fm[p] || wood.masks[prod][p]) continue;
+          const i = p * 4;
+          const [h, s, v] = rgb2hsv(bd[i], bd[i + 1], bd[i + 2]);
+          const oak = h >= 12 && h <= 60 && s >= 0.16 && v >= 0.16;
+          if (!oak) break; // rim ended – above this is background
           wood.masks[prod][p] = 1;
+          added++;
         }
       }
-      // let the rim reach down into the unclaimed seam above the fabric
-      // (but never onto the painted fabric itself)
-      for (let shift = 1; shift <= 3; shift++) {
-        for (let p = shift * W; p < W * H; p++) {
-          if (rim[p - shift * W] && !fab.masks[prod][p]) wood.masks[prod][p] = 1;
-        }
-      }
+      return added;
+    };
+
+    for (const prod of ['sofa', 'chair']) {
+      stats.holes[prod + 'Rim'] = addRim(prod);
       stats.holes[prod + 'Fabric'] = fillHoles(fab.masks[prod]);
       stats.holes[prod + 'Bridged'] = closeInto(wood.masks[prod], fab.masks[prod]);
       stats.holes[prod + 'Wood'] = fillHoles(wood.masks[prod], fab.masks[prod]);
@@ -310,15 +323,41 @@ const REGIONS = require('./lr-regions.js');
     stats.holes.chairWoodEroded = erode1(wood.masks.chair);
 
     // deep shadow stays shadow: recoloring near-black pixels only lifts
-    // them unnaturally, and unpainted they read correctly in any finish
+    // them unnaturally, and unpainted they read correctly in any finish.
+    // Only contiguous dark areas are dropped – isolated dark grain specks
+    // inside a member stay painted, so members do not go mottled.
     let shadowDropped = 0;
-    for (let p = 0; p < W * H; p++) {
-      if (!wood.masks.sofa[p] && !wood.masks.chair[p]) continue;
-      const i = p * 4;
-      if (Math.max(bd[i], bd[i + 1], bd[i + 2]) < 69) {
-        wood.masks.sofa[p] = 0;
-        wood.masks.chair[p] = 0;
-        shadowDropped++;
+    {
+      const dark = new Uint8Array(W * H);
+      for (let p = 0; p < W * H; p++) {
+        if (!wood.masks.sofa[p] && !wood.masks.chair[p]) continue;
+        const i = p * 4;
+        if (Math.max(bd[i], bd[i + 1], bd[i + 2]) < 69) dark[p] = 1;
+      }
+      const lab = new Int32Array(W * H);
+      const stack = new Int32Array(W * H);
+      for (let s = 0; s < W * H; s++) {
+        if (!dark[s] || lab[s]) continue;
+        let sp = 0;
+        stack[sp++] = s; lab[s] = 1;
+        const members = [];
+        while (sp) {
+          const q = stack[--sp];
+          members.push(q);
+          const qx = q % W;
+          for (const dq of [-1, 1, -W, W]) {
+            const r = q + dq;
+            if (r < 0 || r >= W * H || !dark[r] || lab[r]) continue;
+            if (Math.abs((r % W) - qx) > 1) continue;
+            lab[r] = 1; stack[sp++] = r;
+          }
+        }
+        if (members.length < 120) continue;
+        for (const q of members) {
+          wood.masks.sofa[q] = 0;
+          wood.masks.chair[q] = 0;
+          shadowDropped++;
+        }
       }
     }
     stats.holes.shadowDropped = shadowDropped;
