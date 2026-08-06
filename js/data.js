@@ -1,5 +1,8 @@
 // Bump when any mask/asset in public/ changes, so browsers refetch them.
-const ASSET_VERSION = "10";
+// Bump the ?v= on the script and stylesheet tags in index.html to match:
+// a cached copy of this file keeps handing out the old number, so on its
+// own this constant cannot invalidate anything.
+const ASSET_VERSION = "11";
 
 /*
  * Data for the Sideways color configurator.

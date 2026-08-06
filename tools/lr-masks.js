@@ -235,15 +235,34 @@ const REGIONS = require('./lr-regions.js');
     // the back's top edge – but the painting stops a few px shy of that
     // silhouette on both. Unrecolored, the leftover strip reads as a wood
     // rim glued along the back: a salmon piping on the sofa, a mauve one on
-    // the chair. Inside the `rim` search window, take the paint's own top
-    // rows as the reference upholstery color and walk each column upwards
-    // while the photo still matches it. The first row that doesn't is
-    // whatever stands behind the frame, so the fabric ends just below.
+    // the chair. Inside the `rim` search window, each column walks up from
+    // the paint and hands the rows above it back to the fabric.
+    //
+    // Where the top edge ends the two frames look nothing alike, so finding
+    // it takes two rules, and each column takes whichever reaches further:
+    //
+    //  - A creep: step up while the photo still resembles the paint's own
+    //    color and no single row jumps. This is what carries the middle of
+    //    the sofa's back, where it fades into wallpaper of a similar tone
+    //    and there is no edge to find – only a gradient to stop drifting up.
+    //  - A cliff: against the bookcase, or the shelves behind the chair, the
+    //    silhouette is the one enormous jump in the column. The lit crest of
+    //    the roll just below it is far too bright for the creep to cross, so
+    //    look for that jump directly and take everything under it, as long
+    //    as nothing on the way has strayed far enough to be background.
     const snapTop = (m, zone) => {
-      const TOL = 34; // RGB distance at which we've left the upholstery
+      const DRIFT = 45; // RGB distance from the paint's color the creep allows
+      const STEP = 34; // row-to-row jump that ends the creep
+      const CLIFF = 60; // jump big enough to be the silhouette itself
+      const STRAY = 90; // past this the row is background, cliff or no cliff
       const MAX = 8; // further than the paint could plausibly have missed
       const REF = 4; // rows of paint averaged for the reference color
-      let added = 0;
+      const tops = new Int32Array(W).fill(-1); // snapped top row per column
+      const paint = new Int32Array(W).fill(-1); // where the paint itself ends
+      const dist = (i, r, g, b) => {
+        const dr = bd[i] - r, dg = bd[i + 1] - g, db = bd[i + 2] - b;
+        return Math.sqrt(dr * dr + dg * dg + db * db);
+      };
       for (let x = 0; x < W; x++) {
         let y0 = -1;
         for (let y = 0; y < H; y++) {
@@ -257,15 +276,48 @@ const REGIONS = require('./lr-regions.js');
           rr += bd[i]; rg += bd[i + 1]; rb += bd[i + 2]; n++;
         }
         rr /= n; rg /= n; rb /= n;
-        let y = y0;
-        while (y > 0 && y0 - (y - 1) <= MAX && zone[(y - 1) * W + x]) {
-          const i = ((y - 1) * W + x) * 4;
-          const dr = bd[i] - rr, dg = bd[i + 1] - rg, db = bd[i + 2] - rb;
-          if (Math.sqrt(dr * dr + dg * dg + db * db) > TOL) break;
-          y--;
+
+        let creep = y0;
+        while (creep > 0 && y0 - (creep - 1) <= MAX && zone[(creep - 1) * W + x]) {
+          const i = ((creep - 1) * W + x) * 4, j = (creep * W + x) * 4;
+          if (dist(i, rr, rg, rb) > DRIFT) break;
+          if (dist(i, bd[j], bd[j + 1], bd[j + 2]) > STEP) break;
+          creep--;
         }
-        for (let yy = y; yy < y0; yy++) {
-          const p = yy * W + x;
+
+        let cliff = y0;
+        for (let y = y0; y > 0 && y0 - (y - 1) <= MAX && zone[(y - 1) * W + x]; y--) {
+          const i = ((y - 1) * W + x) * 4, j = (y * W + x) * 4;
+          if (dist(i, bd[j], bd[j + 1], bd[j + 2]) >= CLIFF) { cliff = y; break; }
+          if (dist(i, rr, rg, rb) > STRAY) break;
+        }
+
+        paint[x] = y0;
+        tops[x] = Math.min(creep, cliff);
+      }
+
+      // Columns decide independently, so a run of wallpaper that happens to
+      // match can spike one column several px above its neighbours. Pull
+      // each column onto the local median, clamped so it can never rise
+      // above what it found on its own nor drop below the paint.
+      const SMOOTH = 8;
+      let added = 0;
+      for (let x = 0; x < W; x++) {
+        if (tops[x] < 0) continue;
+        const win = [];
+        for (let k = x - SMOOTH; k <= x + SMOOTH; k++) {
+          if (k >= 0 && k < W && tops[k] >= 0) win.push(tops[k]);
+        }
+        win.sort((a, b) => a - b);
+        const med = win[win.length >> 1];
+        // toPng() blurs and re-thresholds, which pulls every mask edge in by
+        // about a pixel. Aim one row past the contour so the edge lands on
+        // it once that shrink has happened, instead of a row short of it –
+        // a row short is exactly the sliver this whole pass exists to remove.
+        const target = Math.min(paint[x], Math.max(tops[x], med));
+        const from = Math.max(0, Math.min(target - 1, paint[x]));
+        for (let y = from; y < paint[x]; y++) {
+          const p = y * W + x;
           if (!m[p]) { m[p] = 1; added++; }
         }
       }
@@ -283,13 +335,6 @@ const REGIONS = require('./lr-regions.js');
       stats.holes[prod + 'Fabric'] = fillHoles(fab.masks[prod]);
       stats.holes[prod + 'Bridged'] = closeInto(wood.masks[prod], fab.masks[prod]);
       stats.holes[prod + 'Wood'] = fillHoles(wood.masks[prod], fab.masks[prod]);
-      // wood is fine lines painted precisely – in any leftover overlap
-      // the wood wins over the broader fabric fill
-      let woodWins = 0;
-      for (let p = 0; p < W * H; p++) {
-        if (wood.masks[prod][p] && fab.masks[prod][p]) { fab.masks[prod][p] = 0; woodWins++; }
-      }
-      stats.holes[prod + 'WoodWins'] = woodWins;
     }
 
     // the painted wood lines run a few px fatter than the real members –
@@ -339,6 +384,22 @@ const REGIONS = require('./lr-regions.js');
     const SOFA_WOOD_MAX_X = 856;
     for (let y = 0; y < H; y++) {
       for (let x2 = SOFA_WOOD_MAX_X; x2 < W; x2++) wood.masks.sofa[y * W + x2] = 0;
+    }
+
+    // Wood is fine lines painted precisely, so it wins any leftover overlap
+    // with the broader fabric fill. This has to come after every step that
+    // takes wood back – the erode, the shadow drop, the cutoff above – or a
+    // pixel handed to the wood and then dropped from it belongs to neither
+    // mask and stays the photo's own color. Along an eroded outline that is
+    // a hairline of untouched photo between the fabric and the frame: at the
+    // top of the sofa's back, where the roll catches the light, it read as a
+    // pale rim in exactly the place there is no rim.
+    for (const prod of ['sofa', 'chair']) {
+      let woodWins = 0;
+      for (let p = 0; p < W * H; p++) {
+        if (wood.masks[prod][p] && fab.masks[prod][p]) { fab.masks[prod][p] = 0; woodWins++; }
+      }
+      stats.holes[prod + 'WoodWins'] = woodWins;
     }
     // the chair stands in front of the sofa – its masks win any overlap
     let ceded = 0;
