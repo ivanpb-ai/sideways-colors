@@ -253,6 +253,78 @@ const REGIONS = require('./lr-regions.js');
     const wood = split(woodWhite, 'wood');
     const stats = { droppedFabric: fab.dropped, droppedWood: wood.dropped, holes: {} };
 
+    // The painted fabric stops a few px below the upholstery's real top
+    // edge, leaving a sliver of the original photo showing above the new
+    // fabric. Grow each column upward while the photo still matches the
+    // fabric right below it (per-column reference, so it works for the
+    // rose sofa and the grey chair alike) and stop at anything else.
+    const growFabricUp = prod => {
+      const fm = fab.masks[prod];
+      const other = prod === 'sofa' ? 'chair' : 'sofa';
+      const grown = new Uint8Array(W * H);
+      let added = 0;
+      for (let x = 0; x < W; x++) {
+        let top = -1;
+        for (let y = 0; y < H; y++) if (fm[y * W + x]) { top = y; break; }
+        if (top <= 0) continue;
+        let rr = 0, gg = 0, bb = 0, n = 0;
+        for (let y = top; y < Math.min(H, top + 5); y++) {
+          if (!fm[y * W + x]) continue;
+          const i = (y * W + x) * 4;
+          rr += bd[i]; gg += bd[i + 1]; bb += bd[i + 2]; n++;
+        }
+        if (!n) continue;
+        rr /= n; gg /= n; bb /= n;
+        for (let y = top - 1; y >= Math.max(0, top - 7); y--) {
+          const p = y * W + x;
+          if (fm[p] || wood.masks[prod][p] || wood.masks[other][p] || fab.masks[other][p]) break;
+          const i = p * 4;
+          const dist = Math.abs(bd[i] - rr) + Math.abs(bd[i + 1] - gg) + Math.abs(bd[i + 2] - bb);
+          if (dist > 60) break; // no longer the same material
+          fm[p] = 1;
+          grown[p] = 1;
+          added++;
+        }
+      }
+      // per-column growth leaves a sawtooth edge; median-filter the top
+      // line across neighbouring columns so it reads as one smooth curve
+      const tops = new Int32Array(W).fill(-1);
+      for (let x = 0; x < W; x++) {
+        for (let y = 0; y < H; y++) if (fm[y * W + x]) { tops[x] = y; break; }
+      }
+      const smoothed = new Int32Array(W).fill(-1);
+      for (let x = 0; x < W; x++) {
+        if (tops[x] < 0) continue;
+        const win = [];
+        for (let k = -3; k <= 3; k++) {
+          const xx = x + k;
+          if (xx >= 0 && xx < W && tops[xx] >= 0) win.push(tops[xx]);
+        }
+        win.sort((a, b) => a - b);
+        smoothed[x] = win[win.length >> 1];
+      }
+      for (let x = 0; x < W; x++) {
+        if (tops[x] < 0) continue;
+        const t = tops[x], sm = smoothed[x];
+        if (sm < t) {
+          for (let y = sm; y < t; y++) {
+            const p = y * W + x;
+            if (wood.masks[prod][p] || wood.masks[other][p] || fab.masks[other][p]) continue;
+            fm[p] = 1; grown[p] = 1; added++;
+          }
+        } else if (sm > t) {
+          for (let y = t; y < sm; y++) {
+            const p = y * W + x;
+            if (!grown[p]) break; // never cut into the painted fabric
+            fm[p] = 0; added--;
+          }
+        }
+      }
+      return added;
+    };
+    stats.holes.sofaGrown = growFabricUp('sofa');
+    stats.holes.chairGrown = growFabricUp('chair');
+
     // The thin lit rim above the upholstery is missing from the painting.
     // Derive it from the data instead of tracing it: walk up from the
     // fabric's own top edge and take only pixels that really look like
