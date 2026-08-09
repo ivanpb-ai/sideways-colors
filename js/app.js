@@ -108,11 +108,34 @@ function loadTile(path, size) {
   const key = `${path}@${size}`;
   if (!tileCache[key]) {
     tileCache[key] = loadImage(path).then((img) => {
+      // Downscale by repeated halving: a single big drawImage step is
+      // bilinear-filtered, which aliases the weave into coarse blotches
+      // at the small tile sizes the living room scene uses.
+      let cur = document.createElement("canvas");
+      cur.width = img.naturalWidth;
+      cur.height = img.naturalHeight;
+      let cx = cur.getContext("2d");
+      cx.imageSmoothingEnabled = true;
+      cx.imageSmoothingQuality = "high";
+      cx.drawImage(img, 0, 0);
+      while (cur.width > size * 2) {
+        const next = document.createElement("canvas");
+        next.width = Math.max(size, Math.round(cur.width / 2));
+        next.height = Math.max(size, Math.round(cur.height / 2));
+        const nx = next.getContext("2d");
+        nx.imageSmoothingEnabled = true;
+        nx.imageSmoothingQuality = "high";
+        nx.drawImage(cur, 0, 0, next.width, next.height);
+        cur = next;
+      }
       const c = document.createElement("canvas");
       c.width = size;
       c.height = size;
-      c.getContext("2d").drawImage(img, 0, 0, size, size);
-      return c.getContext("2d").getImageData(0, 0, size, size);
+      const ctx = c.getContext("2d");
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = "high";
+      ctx.drawImage(cur, 0, 0, size, size);
+      return ctx.getImageData(0, 0, size, size);
     });
   }
   return tileCache[key];
@@ -149,8 +172,13 @@ function recolorRegion(out, sc, region, tile, woodHex) {
       let fr = 0, fg = 0, fb = 0;
       if (af) {
         const f = Math.pow(sc.lumMap[p] / region.meanLum, 0.85);
-        const u = ((Math.round(ta * x + tb * y) % ts) + ts) % ts;
-        const v = ((Math.round(tc2 * x + td2 * y) % ts) + ts) % ts;
+        // mirror-tile: the swatch crop is not seamless, so plain wrapping
+        // leaves a faint grid of repeat seams across large fabric areas
+        const p2 = ts * 2;
+        const uu = ((Math.round(ta * x + tb * y) % p2) + p2) % p2;
+        const vv = ((Math.round(tc2 * x + td2 * y) % p2) + p2) % p2;
+        const u = uu < ts ? uu : p2 - 1 - uu;
+        const v = vv < ts ? vv : p2 - 1 - vv;
         const ti = (v * ts + u) * 4;
         fr = Math.min(255, td[ti] * f);
         fg = Math.min(255, td[ti + 1] * f);
